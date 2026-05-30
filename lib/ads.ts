@@ -1,0 +1,35 @@
+declare global {
+  interface Window {
+    atOptions?: {
+      key: string;
+      format: string;
+      height: number;
+      width: number;
+      params: Record<string, unknown>;
+    };
+  }
+}
+
+export const BANNER_AD = {
+  key: "63b55d97f8f56f45eff6eb11de497487",
+  script: "https://www.highperformanceformat.com/63b55d97f8f56f45eff6eb11de497487/invoke.js",
+  height: 90,
+  width: 728,
+};
+
+export const POPUNDER_AD_SCRIPT =
+  "https://pl29593548.effectivecpmnetwork.com/d8/ab/b5/d8abb563542bc3a0f03cf8f301a842f2.js";
+
+export function triggerPopunderAd(): void {
+  if (typeof window === "undefined") return;
+
+  document
+    .querySelectorAll("script[data-adsterra-popunder='true']")
+    .forEach((node) => node.remove());
+
+  const script = document.createElement("script");
+  script.src = POPUNDER_AD_SCRIPT;
+  script.async = true;
+  script.dataset.adsterraPopunder = "true";
+  document.body.appendChild(script);
+}

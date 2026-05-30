@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "channels:build": "node scripts/build-channels.mjs",
+    "predev": "npm run channels:build",
+    "prebuild": "npm run channels:build",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

@@ -2,66 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import {
+  HLS_CONFIG,
+  preloadHls,
+  STREAM_TIMEOUT_MS,
+  type HlsInstance,
+} from "@/lib/hls-loader";
 import type { Channel, ChannelSource } from "@/lib/types";
-
-type HlsInstance = {
-  destroy: () => void;
-  loadSource: (url: string) => void;
-  attachMedia: (element: HTMLMediaElement) => void;
-  on: (event: string, callback: (...args: unknown[]) => void) => void;
-};
-
-type HlsConstructor = {
-  isSupported: () => boolean;
-  Events: { MANIFEST_PARSED: string; ERROR: string };
-  new (): HlsInstance;
-};
-
-declare global {
-  interface Window {
-    Hls?: HlsConstructor;
-  }
-}
-
-const HLS_SCRIPT = "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
-
-function loadHlsScript(): Promise<HlsConstructor> {
-  if (typeof window === "undefined") {
-    return Promise.reject(new Error("HLS is only available in the browser"));
-  }
-
-  if (window.Hls) {
-    return Promise.resolve(window.Hls);
-  }
-
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector<HTMLScriptElement>(
-      'script[data-hls-player="true"]',
-    );
-
-    if (existing) {
-      existing.addEventListener("load", () => {
-        if (window.Hls) resolve(window.Hls);
-        else reject(new Error("Failed to load HLS.js"));
-      });
-      existing.addEventListener("error", () =>
-        reject(new Error("Failed to load HLS.js")),
-      );
-      return;
-    }
-
-    const script = document.createElement("script");
-    script.src = HLS_SCRIPT;
-    script.async = true;
-    script.dataset.hlsPlayer = "true";
-    script.onload = () => {
-      if (window.Hls) resolve(window.Hls);
-      else reject(new Error("Failed to load HLS.js"));
-    };
-    script.onerror = () => reject(new Error("Failed to load HLS.js"));
-    document.head.appendChild(script);
-  });
-}
 
 function destroyHls(hlsRef: React.RefObject<HlsInstance | null>) {
   if (hlsRef.current) {
@@ -90,6 +37,10 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
+    void preloadHls();
+  }, []);
+
+  useEffect(() => {
     const video = videoRef.current;
     if (!video || !channel) {
       setStatus("idle");
@@ -111,8 +62,14 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
         const finish = (success: boolean) => {
           if (settled || cancelled) return;
           settled = true;
+          window.clearTimeout(timeoutId);
           resolve(success);
         };
+
+        const timeoutId = window.setTimeout(
+          () => finish(false),
+          STREAM_TIMEOUT_MS,
+        );
 
         destroyHls(hlsRef);
         resetVideo(video);
@@ -143,14 +100,14 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
         }
 
         if (isHls) {
-          void loadHlsScript()
+          void preloadHls()
             .then((Hls) => {
               if (cancelled || !Hls.isSupported()) {
                 finish(false);
                 return;
               }
 
-              const hls = new Hls();
+              const hls = new Hls(HLS_CONFIG);
               hlsRef.current = hls;
               hls.loadSource(url);
               hls.attachMedia(video);
@@ -179,14 +136,12 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
 
       const primaryOk = await playUrl(channel.url);
       if (cancelled) return;
-
       if (primaryOk) return;
 
       if (channel.fallbackUrl) {
         setActiveSource("sky");
         const fallbackOk = await playUrl(channel.fallbackUrl);
         if (cancelled) return;
-
         if (fallbackOk) return;
       }
 
@@ -215,7 +170,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
               controls={!isLoading}
               playsInline
               autoPlay
-              preload="auto"
+              preload="none"
             />
             {isLoading && (
               <div className="player-overlay">
@@ -250,6 +205,7 @@ export function VideoPlayer({ channel }: VideoPlayerProps) {
                 src={channel.logo}
                 alt=""
                 className="player-channel-logo"
+                decoding="async"
               />
             ) : (
               <div className="player-channel-logo player-channel-logo-fallback">

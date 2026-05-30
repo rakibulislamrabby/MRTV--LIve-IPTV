@@ -48,6 +48,34 @@ input {
   font: inherit;
 }
 
+.ad-banner {
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  min-height: 90px;
+  padding: 0.5rem 0.75rem;
+  background: rgba(0, 0, 0, 0.28);
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.ad-banner-slot {
+  width: 728px;
+  max-width: 100%;
+  min-height: 90px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ad-banner-slot iframe {
+  display: block;
+  max-width: 100%;
+}
+
 .iptv-app {
   height: 100vh;
   display: flex;

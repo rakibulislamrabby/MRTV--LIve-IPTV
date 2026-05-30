@@ -1,9 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { triggerPopunderAd } from "@/lib/ads";
+import { preloadHls } from "@/lib/hls-loader";
 import type { Channel } from "@/lib/types";
 
+import { AdBanner } from "./AdBanner";
+import { ChannelItem } from "./ChannelItem";
 import { VideoPlayer } from "./VideoPlayer";
 
 interface IptvAppProps {
@@ -28,18 +32,41 @@ function sortGroups(groups: string[]): string[] {
 }
 
 export function IptvApp({ channels }: IptvAppProps) {
-  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(
-    channels[0] ?? null,
-  );
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeGroup, setActiveGroup] = useState<string>("All");
   const [panelOpen, setPanelOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
+  useEffect(() => {
+    void preloadHls();
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSelectedChannel((current) => current ?? channels[0] ?? null);
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [channels]);
+
   const groups = useMemo(() => {
     const unique = new Set(channels.map((channel) => channel.group));
     return sortGroups([...unique]);
   }, [channels]);
+
+  const groupCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const channel of channels) {
+      counts.set(channel.group, (counts.get(channel.group) ?? 0) + 1);
+    }
+    return counts;
+  }, [channels]);
+
+  const backupCount = useMemo(
+    () => channels.reduce((count, channel) => count + (channel.fallbackUrl ? 1 : 0), 0),
+    [channels],
+  );
 
   const filteredChannels = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -56,17 +83,32 @@ export function IptvApp({ channels }: IptvAppProps) {
     });
   }, [activeGroup, channels, searchQuery]);
 
-  const backupCount = channels.filter((channel) => channel.fallbackUrl).length;
-
-  const handleSelectChannel = (channel: Channel) => {
+  const handleSelectChannel = useCallback((channel: Channel) => {
+    triggerPopunderAd();
     setSelectedChannel(channel);
     setPanelOpen(false);
-  };
+  }, []);
 
-  const handleSelectGroup = (group: string) => {
+  const handleSelectGroup = useCallback((group: string) => {
+    triggerPopunderAd();
     setActiveGroup(group);
     setCategoriesOpen(false);
-  };
+  }, []);
+
+  const handleTogglePanel = useCallback(() => {
+    triggerPopunderAd();
+    setPanelOpen((open) => !open);
+  }, []);
+
+  const handleToggleCategories = useCallback(() => {
+    triggerPopunderAd();
+    setCategoriesOpen((open) => !open);
+  }, []);
+
+  const handleClosePanel = useCallback(() => {
+    triggerPopunderAd();
+    setPanelOpen(false);
+  }, []);
 
   return (
     <div className="iptv-app">
@@ -75,7 +117,7 @@ export function IptvApp({ channels }: IptvAppProps) {
           <button
             type="button"
             className="menu-button lg-hidden"
-            onClick={() => setPanelOpen((open) => !open)}
+            onClick={handleTogglePanel}
             aria-label="Toggle channel panel"
           >
             ☰
@@ -103,6 +145,8 @@ export function IptvApp({ channels }: IptvAppProps) {
         </div>
       </header>
 
+      <AdBanner />
+
       <div className="iptv-layout">
         <main className="iptv-main">
           <VideoPlayer channel={selectedChannel} />
@@ -113,7 +157,7 @@ export function IptvApp({ channels }: IptvAppProps) {
             type="button"
             className="panel-backdrop lg-hidden"
             aria-label="Close channel panel"
-            onClick={() => setPanelOpen(false)}
+            onClick={handleClosePanel}
           />
         )}
 
@@ -127,7 +171,7 @@ export function IptvApp({ channels }: IptvAppProps) {
             <button
               type="button"
               className={`category-toggle ${categoriesOpen ? "open" : ""}`}
-              onClick={() => setCategoriesOpen((open) => !open)}
+              onClick={handleToggleCategories}
               aria-expanded={categoriesOpen}
             >
               <span className="category-toggle-label">
@@ -161,12 +205,7 @@ export function IptvApp({ channels }: IptvAppProps) {
                     onClick={() => handleSelectGroup(group)}
                   >
                     {group}
-                    <span>
-                      {
-                        channels.filter((channel) => channel.group === group)
-                          .length
-                      }
-                    </span>
+                    <span>{groupCounts.get(group) ?? 0}</span>
                   </button>
                 ))}
               </div>
@@ -177,42 +216,14 @@ export function IptvApp({ channels }: IptvAppProps) {
             {filteredChannels.length === 0 ? (
               <li className="channel-empty">No channels match your search.</li>
             ) : (
-              filteredChannels.map((channel) => {
-                const isActive = selectedChannel?.id === channel.id;
-
-                return (
-                  <li key={channel.id}>
-                    <button
-                      type="button"
-                      className={`channel-item ${isActive ? "active" : ""}`}
-                      onClick={() => handleSelectChannel(channel)}
-                    >
-                      {channel.logo ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={channel.logo}
-                          alt=""
-                          className="channel-logo"
-                        />
-                      ) : (
-                        <div className="channel-logo channel-logo-fallback">
-                          {channel.name.charAt(0)}
-                        </div>
-                      )}
-                      <div className="channel-copy">
-                        <span className="channel-name">{channel.name}</span>
-                        <span className="channel-meta">
-                          {channel.group}
-                          {channel.fallbackUrl && (
-                            <span className="backup-tag">Sky backup</span>
-                          )}
-                        </span>
-                      </div>
-                      {isActive && <span className="channel-live-dot" />}
-                    </button>
-                  </li>
-                );
-              })
+              filteredChannels.map((channel) => (
+                <ChannelItem
+                  key={channel.id}
+                  channel={channel}
+                  isActive={selectedChannel?.id === channel.id}
+                  onSelect={handleSelectChannel}
+                />
+              ))
             )}
           </ul>
         </aside>
