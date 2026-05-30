@@ -131,22 +131,42 @@ export function IptvApp({ channels }: IptvAppProps) {
   return (
     <div className="iptv-app" onClickCapture={handleButtonPopunder}>
       <header className="iptv-header">
-        <div className="iptv-header-left">
-          <button
-            type="button"
-            className="menu-button lg-hidden"
-            onClick={handleTogglePanel}
-            aria-label="Toggle channel panel"
-          >
-            ☰
-          </button>
-          <div>
-            <p className="iptv-kicker">Live IPTV</p>
-            <h1>MR TV</h1>
+        <div className="iptv-header-top">
+          <div className="iptv-header-left">
+            <button
+              type="button"
+              className="menu-button lg-hidden"
+              onClick={handleTogglePanel}
+              aria-label="Toggle channel panel"
+            >
+              ☰
+            </button>
+            <div className="brand-block">
+              <p className="iptv-kicker">Live IPTV</p>
+              <h1 className="brand-title">MR TV</h1>
+            </div>
+          </div>
+
+          <div className="iptv-header-action">
+            {fifaChannel ? (
+              <button
+                type="button"
+                className="fifa-tv-button"
+                onClick={handlePlayFifa}
+              >
+                <span className="fifa-tv-icon" aria-hidden="true">
+                  ⚽
+                </span>
+                FIFA TV
+              </button>
+            ) : null}
           </div>
         </div>
 
         <div className="iptv-search-wrap">
+          <span className="search-icon" aria-hidden="true">
+            ⌕
+          </span>
           <input
             type="search"
             value={searchQuery}
@@ -154,18 +174,6 @@ export function IptvApp({ channels }: IptvAppProps) {
             placeholder="Search channels…"
             className="iptv-search"
           />
-        </div>
-
-        <div className="iptv-header-action">
-          {fifaChannel ? (
-            <button
-              type="button"
-              className="fifa-tv-button"
-              onClick={handlePlayFifa}
-            >
-              FIFA TV
-            </button>
-          ) : null}
         </div>
       </header>
 
