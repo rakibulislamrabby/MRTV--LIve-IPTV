@@ -10,8 +10,10 @@ import {
 } from "@/lib/hls-loader";
 import type { Channel, ChannelSource } from "@/lib/types";
 
-const MAX_AUTO_RETRIES = 2;
-const RETRY_DELAY_MS = 800;
+const MAX_AUTO_RETRIES = 3;
+const RETRY_DELAY_MS = 700;
+const PLAY_WATCHDOG_MS = 5000;
+const PLAY_WATCHDOG_INTERVAL_MS = 400;
 
 function destroyHls(hlsRef: React.RefObject<HlsInstance | null>) {
   if (hlsRef.current) {
@@ -28,6 +30,39 @@ function resetVideo(video: HTMLVideoElement) {
 
 function wait(ms: number): Promise<void> {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
+}
+
+async function forcePlay(video: HTMLVideoElement): Promise<boolean> {
+  video.muted = true;
+  video.defaultMuted = true;
+  video.playsInline = true;
+
+  try {
+    await video.play();
+    return !video.paused;
+  } catch {
+    return false;
+  }
+}
+
+function startPlayWatchdog(
+  video: HTMLVideoElement,
+  isCancelled: () => boolean,
+): () => void {
+  const startedAt = Date.now();
+
+  const intervalId = window.setInterval(() => {
+    if (isCancelled() || Date.now() - startedAt > PLAY_WATCHDOG_MS) {
+      window.clearInterval(intervalId);
+      return;
+    }
+
+    if (video.paused && video.readyState >= 2) {
+      void forcePlay(video);
+    }
+  }, PLAY_WATCHDOG_INTERVAL_MS);
+
+  return () => window.clearInterval(intervalId);
 }
 
 interface VideoPlayerProps {
@@ -54,8 +89,17 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
     }
 
     let cancelled = false;
+    let stopWatchdog = () => {};
 
-    const playUrl = (url: string, allowMutedFallback: boolean): Promise<boolean> =>
+    const isCancelled = () => cancelled;
+
+    const markPlaying = () => {
+      if (!cancelled) {
+        setStatus("playing");
+      }
+    };
+
+    const playUrl = (url: string): Promise<boolean> =>
       new Promise((resolve) => {
         if (cancelled) {
           resolve(false);
@@ -67,6 +111,7 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
           if (settled || cancelled) return;
           settled = true;
           window.clearTimeout(timeoutId);
+          stopWatchdog();
           resolve(success);
         };
 
@@ -86,42 +131,46 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
           return;
         }
 
-        const tryPlay = () => {
-          video.muted = true;
-          void video.play().catch(() => {
-            if (!allowMutedFallback) {
-              finish(false);
-              return;
-            }
-
-            void video.play().catch(() => finish(false));
-          });
+        const onNativePlaying = () => {
+          markPlaying();
+          finishWithCleanup(true);
         };
 
-        const onNativeError = () => finish(false);
+        const onNativeError = () => finishWithCleanup(false);
 
-        const onNativePlaying = () => {
+        const onCanPlay = () => {
+          if (!video.paused) return;
+          void attemptPlay();
+        };
+
+        const cleanupListeners = () => {
           video.removeEventListener("playing", onNativePlaying);
           video.removeEventListener("error", onNativeError);
-          if (!cancelled) {
-            setStatus("playing");
-            window.setTimeout(() => {
-              if (!cancelled && !video.paused) {
-                video.muted = false;
-                void video.play().catch(() => {
-                  video.muted = true;
-                });
-              }
-            }, 150);
-          }
-          finish(true);
+          video.removeEventListener("canplay", onCanPlay);
         };
 
+        const finishWithCleanup = (success: boolean) => {
+          cleanupListeners();
+          finish(success);
+        };
+
+        const attemptPlay = async () => {
+          const played = await forcePlay(video);
+          if (played) {
+            markPlaying();
+            finishWithCleanup(true);
+          }
+        };
+
+        video.addEventListener("playing", onNativePlaying);
+        video.addEventListener("error", onNativeError, { once: true });
+        video.addEventListener("canplay", onCanPlay);
+
+        stopWatchdog = startPlayWatchdog(video, isCancelled);
+
         if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
-          video.addEventListener("playing", onNativePlaying, { once: true });
-          video.addEventListener("error", onNativeError, { once: true });
           video.src = url;
-          tryPlay();
+          void attemptPlay();
           return;
         }
 
@@ -135,32 +184,36 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
 
               const hls = new Hls(HLS_CONFIG);
               hlsRef.current = hls;
-              hls.loadSource(url);
               hls.attachMedia(video);
+              hls.loadSource(url);
 
-              hls.on(Hls.Events.MANIFEST_PARSED, tryPlay);
-              hls.on(Hls.Events.ERROR, () => finish(false));
-              video.addEventListener("playing", onNativePlaying, { once: true });
+              hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                void attemptPlay();
+              });
+
+              hls.on(Hls.Events.ERROR, () => {
+                if (!video.paused) return;
+                void attemptPlay();
+              });
             })
             .catch(() => finish(false));
+
           return;
         }
 
-        video.addEventListener("playing", onNativePlaying, { once: true });
-        video.addEventListener("error", onNativeError, { once: true });
         video.src = url;
-        tryPlay();
+        void attemptPlay();
       });
 
-    const trySources = async (allowMutedFallback: boolean): Promise<boolean> => {
+    const trySources = async (): Promise<boolean> => {
       setActiveSource("aynaott");
-      const primaryOk = await playUrl(channel.url, allowMutedFallback);
+      const primaryOk = await playUrl(channel.url);
       if (cancelled) return false;
       if (primaryOk) return true;
 
       if (channel.fallbackUrl) {
         setActiveSource("sky");
-        const fallbackOk = await playUrl(channel.fallbackUrl, allowMutedFallback);
+        const fallbackOk = await playUrl(channel.fallbackUrl);
         if (cancelled) return false;
         if (fallbackOk) return true;
       }
@@ -192,19 +245,22 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
           if (cancelled) return;
         }
 
-        const ok = await trySources(true);
+        const ok = await trySources();
         if (cancelled) return;
         if (ok) return;
       }
 
-      setStatus("error");
-      setErrorMessage("Stream unavailable on AynaOTT and Sky backup.");
+      if (!cancelled) {
+        setStatus("error");
+        setErrorMessage("Stream unavailable on AynaOTT and Sky backup.");
+      }
     };
 
     void startPlayback();
 
     return () => {
       cancelled = true;
+      stopWatchdog();
       destroyHls(hlsRef);
     };
   }, [channel, playbackKey]);

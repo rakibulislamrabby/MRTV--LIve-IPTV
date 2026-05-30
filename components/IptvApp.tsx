@@ -32,7 +32,9 @@ function sortGroups(groups: string[]): string[] {
 }
 
 export function IptvApp({ channels }: IptvAppProps) {
-  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(
+    () => channels[0] ?? null,
+  );
   const [playbackKey, setPlaybackKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeGroup, setActiveGroup] = useState<string>("All");
@@ -40,17 +42,8 @@ export function IptvApp({ channels }: IptvAppProps) {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   useEffect(() => {
-    let cancelled = false;
-
-    void preloadHls().then(() => {
-      if (!cancelled) {
-        setSelectedChannel((current) => current ?? channels[0] ?? null);
-      }
-    });
-
-    return () => {
-      cancelled = true;
-    };
+    void preloadHls();
+    setSelectedChannel((current) => current ?? channels[0] ?? null);
   }, [channels]);
 
   const groups = useMemo(() => {
