@@ -54,7 +54,6 @@ input {
   justify-content: center;
   align-items: center;
   width: 100%;
-  min-height: 90px;
   padding: 0.5rem 0.75rem;
   background: rgba(0, 0, 0, 0.28);
   border-bottom: 1px solid var(--border);
@@ -62,10 +61,16 @@ input {
   z-index: 10;
 }
 
-.ad-banner-slot {
-  width: 728px;
-  max-width: 100%;
+.ad-banner-desktop {
   min-height: 90px;
+}
+
+.ad-banner-mobile {
+  min-height: 250px;
+}
+
+.ad-banner-slot {
+  max-width: 100%;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -116,13 +121,28 @@ input {
   font-weight: 700;
 }
 
-.iptv-stats {
+.iptv-header-action {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
   justify-content: flex-end;
-  color: var(--muted);
-  font-size: 0.85rem;
+}
+
+.fifa-tv-button {
+  border: 1px solid rgba(34, 197, 94, 0.45);
+  background: linear-gradient(135deg, rgba(34, 197, 94, 0.22), rgba(14, 165, 233, 0.14));
+  color: #ecfdf5;
+  border-radius: 999px;
+  padding: 0.65rem 1.1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: 160ms ease;
+  white-space: nowrap;
+}
+
+.fifa-tv-button:hover {
+  border-color: rgba(34, 197, 94, 0.75);
+  box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.14);
+  transform: translateY(-1px);
 }
 
 .iptv-search-wrap {
@@ -144,10 +164,6 @@ input {
 .iptv-search:focus {
   border-color: rgba(56, 189, 248, 0.45);
   box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.12);
-}
-
-.stat-divider {
-  opacity: 0.45;
 }
 
 .iptv-layout {
@@ -580,10 +596,6 @@ input {
 @media (max-width: 1024px) {
   .iptv-header {
     grid-template-columns: 1fr;
-  }
-
-  .iptv-stats {
-    justify-content: flex-start;
   }
 
   .iptv-layout {

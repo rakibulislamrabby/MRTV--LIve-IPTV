@@ -1,40 +1,73 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
-import { BANNER_AD } from "@/lib/ads";
+import {
+  getBannerAdForViewport,
+  MOBILE_BANNER_QUERY,
+  type BannerAdConfig,
+} from "@/lib/ads";
+
+function loadBanner(slot: HTMLDivElement, config: BannerAdConfig): void {
+  slot.replaceChildren();
+  slot.dataset.bannerKey = config.key;
+
+  window.atOptions = {
+    key: config.key,
+    format: "iframe",
+    height: config.height,
+    width: config.width,
+    params: {},
+  };
+
+  const script = document.createElement("script");
+  script.src = config.script;
+  script.async = true;
+  script.dataset.adsterraBanner = config.key;
+  slot.appendChild(script);
+}
 
 export function AdBanner() {
   const slotRef = useRef<HTMLDivElement>(null);
-  const loadedRef = useRef(false);
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_BANNER_QUERY);
+    const updateViewport = () => setIsMobile(media.matches);
+
+    updateViewport();
+    media.addEventListener("change", updateViewport);
+
+    return () => media.removeEventListener("change", updateViewport);
+  }, []);
 
   useEffect(() => {
     const slot = slotRef.current;
-    if (!slot || loadedRef.current) return;
+    if (!slot) return;
 
-    loadedRef.current = true;
+    const config = getBannerAdForViewport(isMobile);
+    if (slot.dataset.bannerKey === config.key && slot.childElementCount > 0) {
+      return;
+    }
 
-    window.atOptions = {
-      key: BANNER_AD.key,
-      format: "iframe",
-      height: BANNER_AD.height,
-      width: BANNER_AD.width,
-      params: {},
-    };
+    loadBanner(slot, config);
+  }, [isMobile]);
 
-    const script = document.createElement("script");
-    script.src = BANNER_AD.script;
-    script.async = true;
-    script.dataset.adsterraBanner = "true";
-    slot.appendChild(script);
-  }, []);
+  const config = getBannerAdForViewport(isMobile);
 
   return (
-    <div className="ad-banner" aria-label="Advertisement">
+    <div
+      className={`ad-banner ${isMobile ? "ad-banner-mobile" : "ad-banner-desktop"}`}
+      aria-label="Advertisement"
+    >
       <div
         ref={slotRef}
-        id={`adsterra-banner-${BANNER_AD.key}`}
+        id={`adsterra-banner-${config.key}`}
         className="ad-banner-slot"
+        style={{
+          width: config.width,
+          minHeight: config.height,
+        }}
       />
     </div>
   );

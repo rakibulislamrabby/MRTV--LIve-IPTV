@@ -72,4 +72,4 @@ export const HLS_CONFIG = {
   startFragPrefetch: true,
 };
 
-export const STREAM_TIMEOUT_MS = 6000;
+export const STREAM_TIMEOUT_MS = 12000;

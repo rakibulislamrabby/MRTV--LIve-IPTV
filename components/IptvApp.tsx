@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { triggerPopunderAd } from "@/lib/ads";
+import { isButtonClickTarget, triggerPopunderAd } from "@/lib/ads";
 import { preloadHls } from "@/lib/hls-loader";
 import type { Channel } from "@/lib/types";
 
@@ -33,21 +33,24 @@ function sortGroups(groups: string[]): string[] {
 
 export function IptvApp({ channels }: IptvAppProps) {
   const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+  const [playbackKey, setPlaybackKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeGroup, setActiveGroup] = useState<string>("All");
   const [panelOpen, setPanelOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
 
   useEffect(() => {
-    void preloadHls();
-  }, []);
+    let cancelled = false;
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      setSelectedChannel((current) => current ?? channels[0] ?? null);
-    }, 250);
+    void preloadHls().then(() => {
+      if (!cancelled) {
+        setSelectedChannel((current) => current ?? channels[0] ?? null);
+      }
+    });
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      cancelled = true;
+    };
   }, [channels]);
 
   const groups = useMemo(() => {
@@ -63,8 +66,11 @@ export function IptvApp({ channels }: IptvAppProps) {
     return counts;
   }, [channels]);
 
-  const backupCount = useMemo(
-    () => channels.reduce((count, channel) => count + (channel.fallbackUrl ? 1 : 0), 0),
+  const fifaChannel = useMemo(
+    () =>
+      channels.find((channel) =>
+        channel.name.toLowerCase().includes("fifa"),
+      ) ?? null,
     [channels],
   );
 
@@ -84,34 +90,46 @@ export function IptvApp({ channels }: IptvAppProps) {
   }, [activeGroup, channels, searchQuery]);
 
   const handleSelectChannel = useCallback((channel: Channel) => {
-    triggerPopunderAd();
     setSelectedChannel(channel);
+    setPlaybackKey((key) => key + 1);
     setPanelOpen(false);
   }, []);
 
   const handleSelectGroup = useCallback((group: string) => {
-    triggerPopunderAd();
     setActiveGroup(group);
     setCategoriesOpen(false);
   }, []);
 
   const handleTogglePanel = useCallback(() => {
-    triggerPopunderAd();
     setPanelOpen((open) => !open);
   }, []);
 
   const handleToggleCategories = useCallback(() => {
-    triggerPopunderAd();
     setCategoriesOpen((open) => !open);
   }, []);
 
   const handleClosePanel = useCallback(() => {
-    triggerPopunderAd();
     setPanelOpen(false);
   }, []);
 
+  const handlePlayFifa = useCallback(() => {
+    if (!fifaChannel) return;
+    setSelectedChannel(fifaChannel);
+    setPlaybackKey((key) => key + 1);
+    setPanelOpen(false);
+  }, [fifaChannel]);
+
+  const handleButtonPopunder = useCallback(
+    (event: React.MouseEvent<HTMLDivElement>) => {
+      if (isButtonClickTarget(event.target)) {
+        triggerPopunderAd();
+      }
+    },
+    [],
+  );
+
   return (
-    <div className="iptv-app">
+    <div className="iptv-app" onClickCapture={handleButtonPopunder}>
       <header className="iptv-header">
         <div className="iptv-header-left">
           <button
@@ -138,10 +156,16 @@ export function IptvApp({ channels }: IptvAppProps) {
           />
         </div>
 
-        <div className="iptv-stats">
-          <span>{channels.length} channels</span>
-          <span className="stat-divider">·</span>
-          <span>{backupCount} Sky backups</span>
+        <div className="iptv-header-action">
+          {fifaChannel ? (
+            <button
+              type="button"
+              className="fifa-tv-button"
+              onClick={handlePlayFifa}
+            >
+              FIFA TV
+            </button>
+          ) : null}
         </div>
       </header>
 
@@ -149,7 +173,7 @@ export function IptvApp({ channels }: IptvAppProps) {
 
       <div className="iptv-layout">
         <main className="iptv-main">
-          <VideoPlayer channel={selectedChannel} />
+          <VideoPlayer channel={selectedChannel} playbackKey={playbackKey} />
         </main>
 
         {panelOpen && (
