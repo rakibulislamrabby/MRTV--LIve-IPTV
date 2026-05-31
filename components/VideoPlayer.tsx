@@ -1,5 +1,6 @@
 "use client";
 
+import { Loader2, Play } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import {
@@ -9,6 +10,8 @@ import {
   type HlsInstance,
 } from "@/lib/hls-loader";
 import type { Channel, ChannelSource } from "@/lib/types";
+
+import { AppIcon } from "./icons";
 
 const MAX_AUTO_RETRIES = 3;
 const RETRY_DELAY_MS = 700;
@@ -283,7 +286,11 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
             />
             {isLoading && (
               <div className="player-overlay">
-                <span className="player-spinner" />
+                <AppIcon
+                  icon={Loader2}
+                  size={40}
+                  className="player-spinner-icon"
+                />
                 <p>
                   {activeSource === "sky"
                     ? "Trying Sky backup…"
@@ -299,7 +306,9 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
           </>
         ) : (
           <div className="player-placeholder">
-            <div className="player-placeholder-icon">▶</div>
+            <div className="player-placeholder-icon">
+              <AppIcon icon={Play} size={28} />
+            </div>
             <p>Select a channel to start watching</p>
           </div>
         )}

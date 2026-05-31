@@ -9,6 +9,10 @@ export const metadata: Metadata = {
   title: "MR TV | Live IPTV",
   description:
     "Watch live TV channels from Sky and AynaOTT playlists in one place.",
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/apple-icon.svg", type: "image/svg+xml" }],
+  },
 };
 
 export default function RootLayout({

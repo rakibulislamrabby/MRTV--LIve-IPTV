@@ -1,8 +1,11 @@
 "use client";
 
+import { CircleDot } from "lucide-react";
 import { memo } from "react";
 
 import type { Channel } from "@/lib/types";
+
+import { AppIcon } from "./icons";
 
 interface ChannelItemProps {
   channel: Channel;
@@ -45,7 +48,9 @@ export const ChannelItem = memo(function ChannelItem({
             )}
           </span>
         </div>
-        {isActive && <span className="channel-live-dot" />}
+        {isActive && (
+          <AppIcon icon={CircleDot} size={14} className="channel-live-dot" />
+        )}
       </button>
     </li>
   );

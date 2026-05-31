@@ -2,11 +2,21 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  ChevronDown,
+  ChevronUp,
+  Menu,
+  Search,
+  Trophy,
+  Tv,
+} from "lucide-react";
+
 import { isButtonClickTarget, triggerPopunderAd } from "@/lib/ads";
 import { preloadHls } from "@/lib/hls-loader";
 import type { Channel } from "@/lib/types";
 
 import { AdBanner } from "./AdBanner";
+import { AppIcon } from "./icons";
 import { ChannelItem } from "./ChannelItem";
 import { VideoPlayer } from "./VideoPlayer";
 
@@ -132,10 +142,13 @@ export function IptvApp({ channels }: IptvAppProps) {
               onClick={handleTogglePanel}
               aria-label="Toggle channel panel"
             >
-              ☰
+              <AppIcon icon={Menu} size={20} />
             </button>
             <div className="brand-block">
-              <p className="iptv-kicker">Live IPTV</p>
+              <p className="iptv-kicker">
+                <AppIcon icon={Tv} size={14} className="brand-kicker-icon" />
+                Live IPTV
+              </p>
               <h1 className="brand-title">MR TV</h1>
             </div>
           </div>
@@ -147,9 +160,7 @@ export function IptvApp({ channels }: IptvAppProps) {
                 className="fifa-tv-button"
                 onClick={handlePlayFifa}
               >
-                <span className="fifa-tv-icon" aria-hidden="true">
-                  ⚽
-                </span>
+                <AppIcon icon={Trophy} size={16} className="fifa-tv-icon" />
                 FIFA TV
               </button>
             ) : null}
@@ -157,9 +168,7 @@ export function IptvApp({ channels }: IptvAppProps) {
         </div>
 
         <div className="iptv-search-wrap">
-          <span className="search-icon" aria-hidden="true">
-            ⌕
-          </span>
+          <AppIcon icon={Search} size={18} className="search-icon" />
           <input
             type="search"
             value={searchQuery}
@@ -205,9 +214,11 @@ export function IptvApp({ channels }: IptvAppProps) {
                   <span className="category-active-pill">{activeGroup}</span>
                 )}
               </span>
-              <span className="category-toggle-chevron" aria-hidden="true">
-                {categoriesOpen ? "▲" : "▼"}
-              </span>
+              <AppIcon
+                icon={categoriesOpen ? ChevronUp : ChevronDown}
+                size={18}
+                className="category-toggle-chevron"
+              />
             </button>
 
             <div
