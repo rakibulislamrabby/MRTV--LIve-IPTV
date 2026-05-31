@@ -161,7 +161,7 @@ export function IptvApp({ channels }: IptvAppProps) {
                 onClick={handlePlayFifa}
               >
                 <AppIcon icon={Trophy} size={16} className="fifa-tv-icon" />
-                FIFA TV
+                FIFA TV LIVE
               </button>
             ) : null}
           </div>

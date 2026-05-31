@@ -4,32 +4,24 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   getBannerAdForViewport,
+  loadBannerAd,
   MOBILE_BANNER_QUERY,
-  type BannerAdConfig,
 } from "@/lib/ads";
 
-function loadBanner(slot: HTMLDivElement, config: BannerAdConfig): void {
-  slot.replaceChildren();
-  slot.dataset.bannerKey = config.key;
+function scheduleBannerLoad(callback: () => void): () => void {
+  if (typeof window.requestIdleCallback === "function") {
+    const id = window.requestIdleCallback(callback, { timeout: 2500 });
+    return () => window.cancelIdleCallback(id);
+  }
 
-  window.atOptions = {
-    key: config.key,
-    format: "iframe",
-    height: config.height,
-    width: config.width,
-    params: {},
-  };
-
-  const script = document.createElement("script");
-  script.src = config.script;
-  script.async = true;
-  script.dataset.adsterraBanner = config.key;
-  slot.appendChild(script);
+  const id = window.setTimeout(callback, 400);
+  return () => window.clearTimeout(id);
 }
 
 export function AdBanner() {
   const slotRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
     const media = window.matchMedia(MOBILE_BANNER_QUERY);
@@ -45,13 +37,40 @@ export function AdBanner() {
     const slot = slotRef.current;
     if (!slot) return;
 
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "120px" },
+    );
+
+    observer.observe(slot);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const slot = slotRef.current;
+    if (!slot || !isVisible) return;
+
     const config = getBannerAdForViewport(isMobile);
     if (slot.dataset.bannerKey === config.key && slot.childElementCount > 0) {
       return;
     }
 
-    loadBanner(slot, config);
-  }, [isMobile]);
+    let cancelled = false;
+    const cancelScheduledLoad = scheduleBannerLoad(() => {
+      if (cancelled) return;
+      loadBannerAd(slot, config);
+    });
+
+    return () => {
+      cancelled = true;
+      cancelScheduledLoad();
+    };
+  }, [isMobile, isVisible]);
 
   const config = getBannerAdForViewport(isMobile);
 
