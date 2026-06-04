@@ -2,8 +2,8 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "MR TV — Live IPTV",
-    short_name: "MR TV",
+    name: "Dofadar Tv — Live IPTV",
+    short_name: "Dofadar Tv",
     description:
       "Watch live TV channels from AynaOTT with Sky backup streams.",
     start_url: "/",

@@ -8,13 +8,13 @@ const HLS_SCRIPT =
   "https://cdn.jsdelivr.net/npm/hls.js@1.5.17/dist/hls.min.js";
 
 export const metadata: Metadata = {
-  title: "MR TV | Live IPTV",
+  title: "Dofadar Tv | Live IPTV",
   description:
     "Watch live TV channels from Sky and AynaOTT playlists in one place.",
-  applicationName: "MR TV",
+  applicationName: "Dofadar Tv",
   appleWebApp: {
     capable: true,
-    title: "MR TV",
+    title: "Dofadar Tv",
     statusBarStyle: "black-translucent",
   },
   formatDetection: {

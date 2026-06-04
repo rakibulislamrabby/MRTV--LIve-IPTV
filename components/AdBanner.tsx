@@ -18,7 +18,12 @@ function scheduleBannerLoad(callback: () => void): () => void {
   return () => window.clearTimeout(id);
 }
 
-export function AdBanner() {
+interface AdBannerProps {
+  /** Header = below nav (desktop). Footer = below channel list (mobile). */
+  placement?: "header" | "footer";
+}
+
+export function AdBanner({ placement = "header" }: AdBannerProps) {
   const slotRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
@@ -72,11 +77,21 @@ export function AdBanner() {
     };
   }, [isMobile, isVisible]);
 
+  if (placement === "header" && isMobile) {
+    return null;
+  }
+
+  if (placement === "footer" && !isMobile) {
+    return null;
+  }
+
   const config = getBannerAdForViewport(isMobile);
 
   return (
     <div
-      className={`ad-banner ${isMobile ? "ad-banner-mobile" : "ad-banner-desktop"}`}
+      className={`ad-banner ad-banner-${placement} ${
+        isMobile ? "ad-banner-mobile" : "ad-banner-desktop"
+      }`}
       aria-label="Advertisement"
     >
       <div

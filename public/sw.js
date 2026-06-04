@@ -1,83 +1,28 @@
-const CACHE_NAME = "mrtv-shell-v1";
-const OFFLINE_URL = "/offline.html";
+// Self-destructing service worker.
+//
+// A previous version cached JS/CSS bundles cache-first, which shadowed freshly
+// built code and caused hydration mismatches (e.g. stale "MR TV" markup). The
+// browser re-checks this file on every navigation, so this version installs,
+// clears every cache, unregisters itself, and reloads open tabs to guarantee
+// clients recover with fresh assets.
 
-const PRECACHE_URLS = [
-  OFFLINE_URL,
-  "/icon.svg",
-  "/apple-icon.svg",
-  "/icons/icon-192.png",
-  "/icons/icon-512.png",
-];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)),
-  );
+self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_NAME)
-          .map((key) => caches.delete(key)),
-      ),
-    ),
-  );
-  self.clients.claim();
-});
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
 
-self.addEventListener("fetch", (event) => {
-  if (event.request.method !== "GET") return;
+      await self.registration.unregister();
+      await self.clients.claim();
 
-  const url = new URL(event.request.url);
-
-  if (url.origin !== self.location.origin) return;
-
-  if (event.request.mode === "navigate") {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          void caches.open(CACHE_NAME).then((cache) => cache.put("/", copy));
-          return response;
-        })
-        .catch(async () => {
-          const cached = await caches.match(event.request);
-          if (cached) return cached;
-          const offline = await caches.match(OFFLINE_URL);
-          if (offline) return offline;
-          return caches.match("/");
-        }),
-    );
-    return;
-  }
-
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) return cached;
-
-      return fetch(event.request)
-        .then((response) => {
-          if (!response.ok) return response;
-
-          const copy = response.clone();
-          if (
-            url.pathname.startsWith("/icons/") ||
-            url.pathname.endsWith(".svg") ||
-            url.pathname.endsWith(".css") ||
-            url.pathname.endsWith(".js")
-          ) {
-            void caches.open(CACHE_NAME).then((cache) =>
-              cache.put(event.request, copy),
-            );
-          }
-
-          return response;
-        })
-        .catch(() => cached);
-    }),
+      const clients = await self.clients.matchAll({ type: "window" });
+      clients.forEach((client) => {
+        client.navigate(client.url);
+      });
+    })(),
   );
 });

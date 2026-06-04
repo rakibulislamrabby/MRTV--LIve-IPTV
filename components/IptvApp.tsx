@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   ChevronDown,
   ChevronUp,
+  Goal,
   Menu,
   Search,
   Trophy,
@@ -50,6 +51,14 @@ export function IptvApp({ channels }: IptvAppProps) {
   const [activeGroup, setActiveGroup] = useState<string>("All");
   const [panelOpen, setPanelOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
+  const [mobileChannelsOpen, setMobileChannelsOpen] = useState(true);
+  const panelRef = useRef<HTMLElement>(null);
+
+  const scrollToMobileChannels = useCallback(() => {
+    requestAnimationFrame(() => {
+      panelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, []);
 
   useEffect(() => {
     void preloadHls();
@@ -77,6 +86,16 @@ export function IptvApp({ channels }: IptvAppProps) {
     [channels],
   );
 
+  const sportsGroup = useMemo(
+    () => groups.find((group) => group.toLowerCase() === "sports") ?? null,
+    [groups],
+  );
+
+  const firstSportsChannel = useMemo(() => {
+    if (!sportsGroup) return null;
+    return channels.find((channel) => channel.group === sportsGroup) ?? null;
+  }, [channels, sportsGroup]);
+
   const filteredChannels = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
@@ -96,12 +115,24 @@ export function IptvApp({ channels }: IptvAppProps) {
     setSelectedChannel(channel);
     setPlaybackKey((key) => key + 1);
     setPanelOpen(false);
+
+    if (typeof window !== "undefined" && window.innerWidth < 1180) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
   }, []);
 
-  const handleSelectGroup = useCallback((group: string) => {
-    setActiveGroup(group);
-    setCategoriesOpen(false);
-  }, []);
+  const handleSelectGroup = useCallback(
+    (group: string) => {
+      setActiveGroup(group);
+      setCategoriesOpen(false);
+      setMobileChannelsOpen(true);
+
+      if (typeof window !== "undefined" && window.innerWidth < 1180) {
+        scrollToMobileChannels();
+      }
+    },
+    [scrollToMobileChannels],
+  );
 
   const handleTogglePanel = useCallback(() => {
     setPanelOpen((open) => !open);
@@ -114,6 +145,24 @@ export function IptvApp({ channels }: IptvAppProps) {
   const handleClosePanel = useCallback(() => {
     setPanelOpen(false);
   }, []);
+
+  const handleShowSports = useCallback(() => {
+    if (!sportsGroup || !firstSportsChannel) return;
+    setActiveGroup(sportsGroup);
+    setSearchQuery("");
+    setSelectedChannel(firstSportsChannel);
+    setPlaybackKey((key) => key + 1);
+    setPanelOpen(false);
+    setMobileChannelsOpen(true);
+
+    if (typeof window !== "undefined" && window.innerWidth < 1180) {
+      scrollToMobileChannels();
+    }
+  }, [firstSportsChannel, scrollToMobileChannels, sportsGroup]);
+
+  const handleShowAllChannels = useCallback(() => {
+    handleSelectGroup("All");
+  }, [handleSelectGroup]);
 
   const handlePlayFifa = useCallback(() => {
     if (!fifaChannel) return;
@@ -149,11 +198,34 @@ export function IptvApp({ channels }: IptvAppProps) {
                 <AppIcon icon={Tv} size={14} className="brand-kicker-icon" />
                 Live IPTV
               </p>
-              <h1 className="brand-title">MR TV</h1>
+              <h1 className="brand-title">Dofadar Tv</h1>
             </div>
           </div>
 
+          <div className="iptv-search-wrap">
+            <AppIcon icon={Search} size={18} className="search-icon" />
+            <input
+              type="search"
+              value={searchQuery}
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Search channel…"
+              className="iptv-search"
+            />
+          </div>
+
           <div className="iptv-header-action">
+            {sportsGroup ? (
+              <button
+                type="button"
+                className={`sports-button ${
+                  activeGroup === sportsGroup ? "active" : ""
+                }`}
+                onClick={handleShowSports}
+              >
+                <AppIcon icon={Goal} size={16} className="sports-icon" />
+                Sports
+              </button>
+            ) : null}
             {fifaChannel ? (
               <button
                 type="button"
@@ -167,19 +239,36 @@ export function IptvApp({ channels }: IptvAppProps) {
           </div>
         </div>
 
-        <div className="iptv-search-wrap">
-          <AppIcon icon={Search} size={18} className="search-icon" />
-          <input
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search channels…"
-            className="iptv-search"
-          />
+        <div className="mobile-header-filters" aria-label="Quick filters">
+          <button
+            type="button"
+            className={`quick-filter ${activeGroup === "All" ? "active" : ""}`}
+            onClick={handleShowAllChannels}
+          >
+            All channels
+          </button>
+          {sportsGroup ? (
+            <button
+              type="button"
+              className={`quick-filter quick-filter-sports ${
+                activeGroup === sportsGroup ? "active" : ""
+              }`}
+              onClick={handleShowSports}
+            >
+              <AppIcon icon={Goal} size={14} />
+              Sports
+            </button>
+          ) : null}
+          {fifaChannel ? (
+            <button type="button" className="quick-filter quick-filter-fifa" onClick={handlePlayFifa}>
+              <AppIcon icon={Trophy} size={14} />
+              FIFA
+            </button>
+          ) : null}
         </div>
       </header>
 
-      <AdBanner />
+      <AdBanner placement="header" />
 
       <div className="iptv-layout">
         <main className="iptv-main">
@@ -195,11 +284,36 @@ export function IptvApp({ channels }: IptvAppProps) {
           />
         )}
 
-        <aside className={`iptv-panel ${panelOpen ? "iptv-panel-open" : ""}`}>
-          <div className="panel-top">
+        <aside
+          ref={panelRef}
+          className={`iptv-panel ${panelOpen ? "iptv-panel-open" : ""} mobile-channels-open`}
+        >
+          <div className="panel-top panel-top-desktop">
             <div className="panel-heading">
               <h2>Channels</h2>
               <span className="panel-count">{filteredChannels.length}</span>
+            </div>
+
+            <div className="quick-filters">
+              <button
+                type="button"
+                className={`quick-filter ${activeGroup === "All" ? "active" : ""}`}
+                onClick={() => handleSelectGroup("All")}
+              >
+                All
+              </button>
+              {sportsGroup ? (
+                <button
+                  type="button"
+                  className={`quick-filter quick-filter-sports ${
+                    activeGroup === sportsGroup ? "active" : ""
+                  }`}
+                  onClick={handleShowSports}
+                >
+                  <AppIcon icon={Goal} size={14} />
+                  Sports
+                </button>
+              ) : null}
             </div>
 
             <button
@@ -262,6 +376,8 @@ export function IptvApp({ channels }: IptvAppProps) {
               ))
             )}
           </ul>
+
+          <AdBanner placement="footer" />
         </aside>
       </div>
     </div>
