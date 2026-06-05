@@ -12,7 +12,11 @@ import {
   Tv,
 } from "lucide-react";
 
-import { isButtonClickTarget, triggerPopunderAd } from "@/lib/ads";
+import {
+  isButtonClickTarget,
+  triggerPopunderAd,
+  triggerSmartLink,
+} from "@/lib/ads";
 import { preloadHls } from "@/lib/hls-loader";
 import type { Channel } from "@/lib/types";
 
@@ -112,6 +116,7 @@ export function IptvApp({ channels }: IptvAppProps) {
   }, [activeGroup, channels, searchQuery]);
 
   const handleSelectChannel = useCallback((channel: Channel) => {
+    triggerSmartLink();
     setSelectedChannel(channel);
     setPlaybackKey((key) => key + 1);
     setPanelOpen(false);
@@ -268,7 +273,7 @@ export function IptvApp({ channels }: IptvAppProps) {
         </div>
       </header>
 
-      <AdBanner placement="header" />
+      {/* <AdBanner placement="header" /> */}
 
       <div className="iptv-layout">
         <main className="iptv-main">

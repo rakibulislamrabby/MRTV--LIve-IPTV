@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import {
-  getBannerAdForViewport,
+  getBannerAdForPlacement,
   loadBannerAd,
   MOBILE_BANNER_QUERY,
 } from "@/lib/ads";
@@ -56,11 +56,12 @@ export function AdBanner({ placement = "header" }: AdBannerProps) {
     return () => observer.disconnect();
   }, []);
 
+  const config = getBannerAdForPlacement(placement, isMobile);
+
   useEffect(() => {
     const slot = slotRef.current;
-    if (!slot || !isVisible) return;
+    if (!slot || !isVisible || !config) return;
 
-    const config = getBannerAdForViewport(isMobile);
     if (slot.dataset.bannerKey === config.key && slot.childElementCount > 0) {
       return;
     }
@@ -75,17 +76,11 @@ export function AdBanner({ placement = "header" }: AdBannerProps) {
       cancelled = true;
       cancelScheduledLoad();
     };
-  }, [isMobile, isVisible]);
+  }, [config, isVisible]);
 
-  if (placement === "header" && isMobile) {
+  if (!config) {
     return null;
   }
-
-  if (placement === "footer" && !isMobile) {
-    return null;
-  }
-
-  const config = getBannerAdForViewport(isMobile);
 
   return (
     <div
@@ -96,7 +91,7 @@ export function AdBanner({ placement = "header" }: AdBannerProps) {
     >
       <div
         ref={slotRef}
-        id={`adsterra-banner-${config.key}`}
+        id={`ad-banner-${config.key}`}
         className="ad-banner-slot"
         style={{
           width: config.width,

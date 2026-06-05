@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 
+import { AdScripts } from "@/components/AdScripts";
 import { PwaRegister } from "@/components/PwaRegister";
+import { AD_NETWORK_ORIGINS } from "@/lib/ads";
 
 import "./globals.css";
 
@@ -48,9 +50,13 @@ export default function RootLayout({
           href="https://cdn.jsdelivr.net"
           crossOrigin="anonymous"
         />
+        {AD_NETWORK_ORIGINS.map((origin) => (
+          <link key={origin} rel="dns-prefetch" href={origin} />
+        ))}
         <link rel="preload" href={HLS_SCRIPT} as="script" />
       </head>
       <body className="h-full">
+        <AdScripts />
         <PwaRegister />
         {children}
       </body>
