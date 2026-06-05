@@ -10,13 +10,12 @@ declare global {
   }
 }
 
-export type AdScriptRole = "popunder" | "social-bar" | "banner";
+export type AdScriptRole = "popunder" | "banner";
 
 /** Origins to prefetch — update when ad zone domains change. */
 export const AD_NETWORK_ORIGINS = [
   "https://www.effectivecpmnetwork.com",
   "https://pl29640358.effectivecpmnetwork.com",
-  "https://pl29640366.effectivecpmnetwork.com",
   "https://www.highperformanceformat.com",
 ] as const;
 
@@ -49,15 +48,11 @@ export const MOBILE_BANNER_QUERY = "(max-width: 1024px)";
 export const POPUNDER_AD_SCRIPT =
   "https://pl29640358.effectivecpmnetwork.com/e8/b8/ec/e8b8ec8e360a2d4306a5f126780965fa.js";
 
-export const SOCIAL_BAR_AD_SCRIPT =
-  "https://pl29640366.effectivecpmnetwork.com/9b/a5/bf/9ba5bffced7821d80c81b2314a02fcf4.js";
-
 export const SMART_LINK_URL =
   "https://www.effectivecpmnetwork.com/p3w1d8tf?key=f870477008fe14aeba582f0eb3eb4858";
 
 const SESSION_KEYS = {
   popunder: "mrtv-popunder-loaded",
-  socialBar: "mrtv-social-bar-loaded",
   smartLink: "mrtv-smart-link-opened",
 } as const;
 
@@ -95,37 +90,6 @@ function appendAdScript(
 
   document.body.appendChild(script);
   return script;
-}
-
-function scheduleWhenIdle(callback: () => void, timeoutMs = 2500): () => void {
-  if (typeof window.requestIdleCallback === "function") {
-    const id = window.requestIdleCallback(callback, { timeout: timeoutMs });
-    return () => window.cancelIdleCallback(id);
-  }
-
-  const id = window.setTimeout(callback, 400);
-  return () => window.clearTimeout(id);
-}
-
-export function loadSocialBarAd(): () => void {
-  if (typeof window === "undefined") {
-    return () => undefined;
-  }
-
-  if (sessionStorage.getItem(SESSION_KEYS.socialBar)) {
-    return () => undefined;
-  }
-  if (hasLoadedAdScript("social-bar")) {
-    return () => undefined;
-  }
-
-  return scheduleWhenIdle(() => {
-    if (sessionStorage.getItem(SESSION_KEYS.socialBar)) return;
-    if (hasLoadedAdScript("social-bar")) return;
-
-    sessionStorage.setItem(SESSION_KEYS.socialBar, "1");
-    appendAdScript(SOCIAL_BAR_AD_SCRIPT, "social-bar");
-  });
 }
 
 export function triggerPopunderAd(): void {

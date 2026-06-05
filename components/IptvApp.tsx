@@ -9,7 +9,6 @@ import {
   Menu,
   Search,
   Trophy,
-  Tv,
 } from "lucide-react";
 
 import {
@@ -21,6 +20,7 @@ import { preloadHls } from "@/lib/hls-loader";
 import type { Channel } from "@/lib/types";
 
 import { AdBanner } from "./AdBanner";
+import { BrandLogo } from "./BrandLogo";
 import { AppIcon } from "./icons";
 import { ChannelItem } from "./ChannelItem";
 import { VideoPlayer } from "./VideoPlayer";
@@ -199,11 +199,7 @@ export function IptvApp({ channels }: IptvAppProps) {
               <AppIcon icon={Menu} size={20} />
             </button>
             <div className="brand-block">
-              <p className="iptv-kicker">
-                <AppIcon icon={Tv} size={14} className="brand-kicker-icon" />
-                Live IPTV
-              </p>
-              <h1 className="brand-title">Dofadar Tv</h1>
+              <BrandLogo compact />
             </div>
           </div>
 

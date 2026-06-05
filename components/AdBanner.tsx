@@ -27,8 +27,11 @@ export function AdBanner({ placement = "header" }: AdBannerProps) {
   const slotRef = useRef<HTMLDivElement>(null);
   const [isMobile, setIsMobile] = useState(false);
   const [isVisible, setIsVisible] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
 
   useEffect(() => {
+    setHasMounted(true);
+
     const media = window.matchMedia(MOBILE_BANNER_QUERY);
     const updateViewport = () => setIsMobile(media.matches);
 
@@ -78,7 +81,7 @@ export function AdBanner({ placement = "header" }: AdBannerProps) {
     };
   }, [config, isVisible]);
 
-  if (!config) {
+  if (!hasMounted || !config) {
     return null;
   }
 

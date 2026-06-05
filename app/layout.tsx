@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 
-import { AdScripts } from "@/components/AdScripts";
 import { PwaRegister } from "@/components/PwaRegister";
 import { AD_NETWORK_ORIGINS } from "@/lib/ads";
 
@@ -42,7 +41,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <head>
         <link rel="dns-prefetch" href="https://cdn.jsdelivr.net" />
         <link
@@ -55,8 +54,7 @@ export default function RootLayout({
         ))}
         <link rel="preload" href={HLS_SCRIPT} as="script" />
       </head>
-      <body className="h-full">
-        <AdScripts />
+      <body className="h-full" suppressHydrationWarning>
         <PwaRegister />
         {children}
       </body>

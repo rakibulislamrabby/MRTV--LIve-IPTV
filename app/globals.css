@@ -14,6 +14,8 @@
   --ayna: #34d399;
   --header-height: 72px;
   --panel-width: 320px;
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --app-top-padding: calc(var(--safe-area-top) + 0.65rem);
 }
 
 @theme inline {
@@ -97,7 +99,7 @@ input {
   display: flex;
   flex-direction: column;
   gap: 0.7rem;
-  padding: 0.85rem 1rem 0.95rem;
+  padding: var(--app-top-padding) 1rem 0.95rem;
   border-bottom: 1px solid var(--border);
   background: rgba(7, 11, 20, 0.94);
   backdrop-filter: blur(18px);
@@ -125,38 +127,58 @@ input {
   min-width: 0;
 }
 
-.lucide-icon {
-  flex-shrink: 0;
-}
-
-.iptv-kicker {
-  margin: 0;
-  font-size: 0.62rem;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--accent);
-  line-height: 1;
+.brand-logo {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.55rem;
+  min-width: 0;
 }
 
-.brand-kicker-icon {
-  color: var(--accent);
+.brand-logo-mark {
+  flex-shrink: 0;
+  display: block;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 14px rgba(56, 189, 248, 0.18);
 }
 
-.brand-title,
-.iptv-header h1 {
-  margin: 0.2rem 0 0;
-  font-size: 1.2rem;
+.brand-logo-text {
+  margin: 0;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.2rem;
+  font-size: 1.25rem;
   font-weight: 800;
   line-height: 1;
+  letter-spacing: -0.03em;
   white-space: nowrap;
-  letter-spacing: -0.02em;
-  background: linear-gradient(90deg, #ffffff 0%, #bae6fd 100%);
+}
+
+.brand-logo-dofadar {
+  background: linear-gradient(90deg, #ffffff 0%, #e0f2fe 52%, #7dd3fc 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+}
+
+.brand-logo-tv {
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 0.88em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.brand-logo-compact .brand-logo-text {
+  font-size: 1.05rem;
+}
+
+.brand-logo-compact .brand-logo-mark {
+  width: 1.75rem;
+  height: 1.75rem;
+}
+
+.lucide-icon {
+  flex-shrink: 0;
 }
 
 .iptv-header-action {
@@ -301,9 +323,13 @@ input {
     margin-inline: auto;
   }
 
-  .brand-title,
-  .iptv-header h1 {
+  .brand-logo-text {
     font-size: 1.35rem;
+  }
+
+  .brand-logo-mark {
+    width: 2.15rem;
+    height: 2.15rem;
   }
 
   .fifa-tv-button,
@@ -787,7 +813,10 @@ input {
     --mobile-header-row: 2.75rem;
     --mobile-header-filters-row: 2.4rem;
     --mobile-header-offset: calc(
-      var(--mobile-header-row) + var(--mobile-header-filters-row) + 1.05rem
+      var(--mobile-header-row) +
+        var(--mobile-header-filters-row) +
+        1.05rem +
+        var(--app-top-padding)
     );
   }
 
@@ -835,7 +864,7 @@ input {
     display: flex;
     flex-direction: column;
     gap: 0.45rem;
-    padding: 0.5rem 0.65rem 0.55rem;
+    padding: calc(var(--app-top-padding) + 0.15rem) 0.65rem 0.55rem;
     z-index: 30;
     background: rgba(5, 7, 13, 0.98);
     backdrop-filter: blur(14px);
@@ -863,16 +892,13 @@ input {
     min-height: var(--mobile-header-row);
   }
 
-  .iptv-kicker {
-    display: none;
+  .brand-logo-compact .brand-logo-text {
+    font-size: 0.98rem;
   }
 
-  .brand-title,
-  .iptv-header h1 {
-    margin: 0;
-    font-size: 1rem;
-    line-height: 1.1;
-    white-space: nowrap;
+  .brand-logo-compact .brand-logo-mark {
+    width: 1.65rem;
+    height: 1.65rem;
   }
 
   .iptv-search-wrap {
