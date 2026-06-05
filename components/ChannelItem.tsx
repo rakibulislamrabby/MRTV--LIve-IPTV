@@ -44,7 +44,7 @@ export const ChannelItem = memo(function ChannelItem({
           <span className="channel-meta">
             {channel.group}
             {channel.fallbackUrl && (
-              <span className="backup-tag">Sky backup</span>
+              <span className="backup-tag">Backup</span>
             )}
           </span>
         </div>

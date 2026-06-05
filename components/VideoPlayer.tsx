@@ -255,7 +255,7 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
 
       if (!cancelled) {
         setStatus("error");
-        setErrorMessage("Stream unavailable on AynaOTT and Sky backup.");
+        setErrorMessage("Stream unavailable.");
       }
     };
 
@@ -293,7 +293,7 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
                 />
                 <p>
                   {activeSource === "sky"
-                    ? "Trying Sky backup…"
+                    ? "Trying backup…"
                     : "Loading stream…"}
                 </p>
               </div>
@@ -333,10 +333,13 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
             <div>
               <h2>{channel.name}</h2>
               <p>
-                {channel.group} ·{" "}
-                <span className={`source-badge source-${activeSource}`}>
-                  {activeSource === "sky" ? "Sky backup" : "AynaOTT"}
-                </span>
+                {channel.group}
+                {activeSource === "sky" ? (
+                  <>
+                    {" · "}
+                    <span className="source-badge source-sky">Backup</span>
+                  </>
+                ) : null}
               </p>
             </div>
           </div>
