@@ -11,6 +11,7 @@ import {
 } from "@/lib/hls-loader";
 import type { Channel, ChannelSource } from "@/lib/types";
 
+import { ChannelLogo } from "./ChannelLogo";
 import { AppIcon } from "./icons";
 
 const MAX_AUTO_RETRIES = 3;
@@ -317,19 +318,12 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
       {channel && (
         <div className="player-meta">
           <div className="player-meta-main">
-            {channel.logo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={channel.logo}
-                alt=""
-                className="player-channel-logo"
-                decoding="async"
-              />
-            ) : (
-              <div className="player-channel-logo player-channel-logo-fallback">
-                {channel.name.charAt(0)}
-              </div>
-            )}
+            <ChannelLogo
+              name={channel.name}
+              logo={channel.logo}
+              className="player-channel-logo"
+              fallbackClassName="player-channel-logo player-channel-logo-fallback"
+            />
             <div>
               <h2>{channel.name}</h2>
               <p>

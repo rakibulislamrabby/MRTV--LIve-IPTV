@@ -5,6 +5,7 @@ import { memo } from "react";
 
 import type { Channel } from "@/lib/types";
 
+import { ChannelLogo } from "./ChannelLogo";
 import { AppIcon } from "./icons";
 
 interface ChannelItemProps {
@@ -25,20 +26,12 @@ export const ChannelItem = memo(function ChannelItem({
         className={`channel-item ${isActive ? "active" : ""}`}
         onClick={() => onSelect(channel)}
       >
-        {channel.logo ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={channel.logo}
-            alt=""
-            className="channel-logo"
-            loading="lazy"
-            decoding="async"
-          />
-        ) : (
-          <div className="channel-logo channel-logo-fallback">
-            {channel.name.charAt(0)}
-          </div>
-        )}
+        <ChannelLogo
+          name={channel.name}
+          logo={channel.logo}
+          className="channel-logo"
+          fallbackClassName="channel-logo channel-logo-fallback"
+        />
         <div className="channel-copy">
           <span className="channel-name">{channel.name}</span>
           <span className="channel-meta">

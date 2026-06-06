@@ -17,12 +17,13 @@ import {
   triggerSmartLink,
 } from "@/lib/ads";
 import { preloadHls } from "@/lib/hls-loader";
+import { findTopSportsChannel, GROUP_PRIORITY, sortChannels } from "@/lib/m3u";
 import type { Channel } from "@/lib/types";
 
 import { AdBanner } from "./AdBanner";
 import { BrandLogo } from "./BrandLogo";
 import { AppIcon } from "./icons";
-import { ChannelItem } from "./ChannelItem";
+import { ChannelList } from "./ChannelList";
 import { VideoPlayer } from "./VideoPlayer";
 
 interface IptvAppProps {
@@ -30,11 +31,9 @@ interface IptvAppProps {
 }
 
 function sortGroups(groups: string[]): string[] {
-  const priority = ["Bangla", "Sports", "News", "Entertainment", "Kids"];
-
   return [...groups].sort((a, b) => {
-    const aIndex = priority.indexOf(a);
-    const bIndex = priority.indexOf(b);
+    const aIndex = GROUP_PRIORITY.indexOf(a);
+    const bIndex = GROUP_PRIORITY.indexOf(b);
 
     if (aIndex !== -1 || bIndex !== -1) {
       if (aIndex === -1) return 1;
@@ -82,13 +81,15 @@ export function IptvApp({ channels }: IptvAppProps) {
     return counts;
   }, [channels]);
 
-  const fifaChannel = useMemo(
-    () =>
-      channels.find((channel) =>
-        channel.name.toLowerCase().includes("fifa"),
-      ) ?? null,
-    [channels],
-  );
+  const fifaChannel = useMemo(() => {
+    const fifaChannels = channels.filter((channel) => /fifa/i.test(channel.name));
+    return (
+      fifaChannels.find((channel) => /fifa\s*plus/i.test(channel.name)) ??
+      fifaChannels.find((channel) => /fifa\+/i.test(channel.name)) ??
+      fifaChannels[0] ??
+      null
+    );
+  }, [channels]);
 
   const sportsGroup = useMemo(
     () => groups.find((group) => group.toLowerCase() === "sports") ?? null,
@@ -97,22 +98,24 @@ export function IptvApp({ channels }: IptvAppProps) {
 
   const firstSportsChannel = useMemo(() => {
     if (!sportsGroup) return null;
-    return channels.find((channel) => channel.group === sportsGroup) ?? null;
+    return findTopSportsChannel(channels, sportsGroup);
   }, [channels, sportsGroup]);
 
   const filteredChannels = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    return channels.filter((channel) => {
-      const matchesGroup =
-        activeGroup === "All" || channel.group === activeGroup;
-      const matchesSearch =
-        !query ||
-        channel.name.toLowerCase().includes(query) ||
-        channel.group.toLowerCase().includes(query);
+    return sortChannels(
+      channels.filter((channel) => {
+        const matchesGroup =
+          activeGroup === "All" || channel.group === activeGroup;
+        const matchesSearch =
+          !query ||
+          channel.name.toLowerCase().includes(query) ||
+          channel.group.toLowerCase().includes(query);
 
-      return matchesGroup && matchesSearch;
-    });
+        return matchesGroup && matchesSearch;
+      }),
+    );
   }, [activeGroup, channels, searchQuery]);
 
   const handleSelectChannel = useCallback((channel: Channel) => {
@@ -363,20 +366,11 @@ export function IptvApp({ channels }: IptvAppProps) {
             </div>
           </div>
 
-          <ul className="channel-list">
-            {filteredChannels.length === 0 ? (
-              <li className="channel-empty">No channels match your search.</li>
-            ) : (
-              filteredChannels.map((channel) => (
-                <ChannelItem
-                  key={channel.id}
-                  channel={channel}
-                  isActive={selectedChannel?.id === channel.id}
-                  onSelect={handleSelectChannel}
-                />
-              ))
-            )}
-          </ul>
+          <ChannelList
+            channels={filteredChannels}
+            selectedChannelId={selectedChannel?.id}
+            onSelect={handleSelectChannel}
+          />
 
           <AdBanner placement="footer" />
         </aside>

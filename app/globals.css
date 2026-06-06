@@ -549,6 +549,18 @@ input {
   overscroll-behavior: contain;
 }
 
+.channel-list > li {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 58px;
+}
+
+.channel-list-spacer {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  pointer-events: none;
+}
+
 .channel-list::-webkit-scrollbar {
   width: 8px;
 }

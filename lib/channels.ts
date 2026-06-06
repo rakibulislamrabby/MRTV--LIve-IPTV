@@ -1,11 +1,13 @@
 import fs from "fs";
 import path from "path";
 
-import { normalizeChannelName, parseM3U } from "./m3u";
+import { attachLogo, buildLogoLookup } from "./logos";
+import { normalizeChannelName, parseM3U, sortChannels } from "./m3u";
 import type { Channel } from "./types";
 
 const SKY_PLAYLIST = "Skym3u-176.m3u";
 const AYNA_PLAYLIST = "aynaott.m3u";
+const SPORTS_PLAYLIST = "sports.m3u";
 const GENERATED_CHANNELS = path.join(process.cwd(), "generated/channels.json");
 
 function getPublicDir(): string {
@@ -21,6 +23,7 @@ function getPlaylistMtime(): number {
   return Math.max(
     fs.statSync(path.join(publicDir, SKY_PLAYLIST)).mtimeMs,
     fs.statSync(path.join(publicDir, AYNA_PLAYLIST)).mtimeMs,
+    fs.statSync(path.join(publicDir, SPORTS_PLAYLIST)).mtimeMs,
   );
 }
 
@@ -37,20 +40,36 @@ function buildSkyFallbackMap(channels: Channel[]): Map<string, string> {
   return fallbacks;
 }
 
+function attachFallback(
+  channel: Channel,
+  fallbacks: Map<string, string>,
+): Channel {
+  const fallbackUrl = fallbacks.get(normalizeChannelName(channel.name));
+
+  return {
+    ...channel,
+    fallbackUrl:
+      fallbackUrl && fallbackUrl !== channel.url ? fallbackUrl : undefined,
+  };
+}
+
 export function buildChannelList(): Channel[] {
   const aynaChannels = parseM3U(readPlaylist(AYNA_PLAYLIST), "aynaott");
   const skyChannels = parseM3U(readPlaylist(SKY_PLAYLIST), "sky");
+  const sportsChannels = parseM3U(readPlaylist(SPORTS_PLAYLIST), "sports");
   const skyFallbacks = buildSkyFallbackMap(skyChannels);
+  const logoLookup = buildLogoLookup(aynaChannels);
 
-  return aynaChannels.map((channel) => {
-    const fallbackUrl = skyFallbacks.get(normalizeChannelName(channel.name));
+  const baseChannels = aynaChannels.map((channel) =>
+    attachFallback(channel, skyFallbacks),
+  );
+  const knownUrls = new Set(baseChannels.map((channel) => channel.url));
+  const extraChannels = sportsChannels
+    .filter((channel) => !knownUrls.has(channel.url))
+    .map((channel) => attachFallback(channel, skyFallbacks))
+    .map((channel) => attachLogo(channel, logoLookup));
 
-    return {
-      ...channel,
-      fallbackUrl:
-        fallbackUrl && fallbackUrl !== channel.url ? fallbackUrl : undefined,
-    };
-  });
+  return sortChannels([...baseChannels, ...extraChannels]);
 }
 
 let memoryCache: { mtime: number; channels: Channel[] } | null = null;
@@ -99,7 +118,7 @@ export function groupChannelsByCategory(
   }
 
   for (const group of Object.keys(groups)) {
-    groups[group].sort((a, b) => a.name.localeCompare(b.name));
+    groups[group] = sortChannels(groups[group]);
   }
 
   return groups;
