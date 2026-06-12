@@ -7,5 +7,3 @@
 [functions]
   node_bundler = "esbuild"
   included_files = ["generated/**", "data/playlists/**"]
-  # IPTV manifest/segment fetches can be slow from serverless.
-  timeout = 26
