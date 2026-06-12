@@ -145,9 +145,24 @@ function readBundledChannels(): Channel[] {
   return sortChannels((bundledChannels as Channel[]).map((channel) => ({ ...channel })));
 }
 
+function readProductionChannels(): Channel[] {
+  const bundled = readBundledChannels();
+  if (bundled.length > 0) {
+    return bundled;
+  }
+
+  if (fs.existsSync(GENERATED_CHANNELS)) {
+    return sortChannels(
+      JSON.parse(fs.readFileSync(GENERATED_CHANNELS, "utf-8")) as Channel[],
+    );
+  }
+
+  return buildChannelList();
+}
+
 export function getChannels(): Channel[] {
   if (process.env.NODE_ENV === "production") {
-    return readBundledChannels();
+    return readProductionChannels();
   }
 
   const generated = readGeneratedChannels();

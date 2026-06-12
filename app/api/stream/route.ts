@@ -8,6 +8,8 @@ import { getPlaybackCandidates } from "@/lib/stream-url";
 import { fetchUpstream, isHlsTarget } from "@/lib/upstream";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 26;
 
 async function proxyTarget(target: string): Promise<NextResponse | null> {
   if (!isAllowedStreamUrl(target)) {
@@ -44,7 +46,8 @@ async function proxyTarget(target: string): Promise<NextResponse | null> {
     });
   }
 
-  return new NextResponse(upstream.body, {
+  const buffer = await upstream.arrayBuffer();
+  return new NextResponse(buffer, {
     headers: {
       "Content-Type": contentType || "application/octet-stream",
       "Cache-Control": "no-store",

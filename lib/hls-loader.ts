@@ -71,12 +71,12 @@ export const HLS_CONFIG = {
   maxMaxBufferLength: 15,
   startFragPrefetch: true,
   startLevel: -1,
-  fragLoadingTimeOut: 8_000,
-  manifestLoadingTimeOut: 8_000,
-  levelLoadingTimeOut: 8_000,
+  fragLoadingTimeOut: 20_000,
+  manifestLoadingTimeOut: 20_000,
+  levelLoadingTimeOut: 20_000,
 };
 
-export const STREAM_TIMEOUT_MS = 8_000;
+export const STREAM_TIMEOUT_MS = 22_000;
 
 export function isHlsPlaybackUrl(url: string): boolean {
   return (

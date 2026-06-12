@@ -33,11 +33,21 @@ export function getUpstreamRequestHeaders(target: string): Record<string, string
   };
 
   try {
-    const host = new URL(target).hostname;
+    const parsed = new URL(target);
+    const host = parsed.hostname;
+
     if (host.includes("aynaott.com")) {
       headers.Origin = "https://aynaott.com";
       headers.Referer = "https://aynaott.com/";
+      return headers;
     }
+
+    if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
+      headers.Referer = `${parsed.protocol}//${parsed.host}/`;
+      return headers;
+    }
+
+    headers.Referer = `${parsed.protocol}//${parsed.host}/`;
   } catch {
     // ignore invalid target URL
   }

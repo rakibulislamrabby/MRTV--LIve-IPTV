@@ -6,6 +6,8 @@ import { rewriteManifest } from "@/lib/stream-proxy";
 import { fetchUpstream, isHlsTarget } from "@/lib/upstream";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const maxDuration = 26;
 
 export async function GET(request: Request) {
   const token = new URL(request.url).searchParams.get("t");
@@ -57,7 +59,8 @@ export async function GET(request: Request) {
       });
     }
 
-    return new NextResponse(upstream.body, {
+    const buffer = await upstream.arrayBuffer();
+    return new NextResponse(buffer, {
       headers: {
         "Content-Type": contentType || "application/octet-stream",
         "Cache-Control": "no-store",

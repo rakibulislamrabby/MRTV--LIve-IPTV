@@ -21,6 +21,11 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: {
+    "/api/catalog": ["./generated/**/*", "./data/playlists/**/*"],
+    "/api/stream": ["./generated/**/*", "./data/playlists/**/*"],
+    "/api/segment": ["./generated/**/*", "./data/playlists/**/*"],
+  },
   async headers() {
     return [
       {

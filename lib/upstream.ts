@@ -1,6 +1,6 @@
 import { getUpstreamRequestHeaders } from "./stream-url";
 
-const UPSTREAM_TIMEOUT_MS = 12_000;
+const UPSTREAM_TIMEOUT_MS = 20_000;
 
 export async function fetchUpstream(
   target: string,
@@ -28,6 +28,7 @@ export async function fetchUpstream(
 export function isHlsTarget(target: string, contentType = ""): boolean {
   return (
     target.includes(".m3u8") ||
+    target.includes(".m3u") ||
     contentType.includes("mpegurl") ||
     contentType.includes("m3u")
   );
