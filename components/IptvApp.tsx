@@ -20,6 +20,8 @@ import { preloadHls } from "@/lib/hls-loader";
 import { findTopSportsChannel, GROUP_PRIORITY, sortChannels } from "@/lib/m3u";
 import type { Channel } from "@/lib/types";
 
+import { useChannelHealth } from "@/hooks/useChannelHealth";
+
 import { AdBanner } from "./AdBanner";
 import { BrandLogo } from "./BrandLogo";
 import { AppIcon } from "./icons";
@@ -56,6 +58,16 @@ export function IptvApp({ channels }: IptvAppProps) {
   const [categoriesOpen, setCategoriesOpen] = useState(false);
   const [mobileChannelsOpen, setMobileChannelsOpen] = useState(true);
   const panelRef = useRef<HTMLElement>(null);
+  const {
+    filterAvailable,
+    isAvailable,
+    reportPlayback,
+  } = useChannelHealth(channels);
+
+  const availableChannels = useMemo(
+    () => filterAvailable(channels),
+    [channels, filterAvailable],
+  );
 
   const scrollToMobileChannels = useCallback(() => {
     requestAnimationFrame(() => {
@@ -65,8 +77,14 @@ export function IptvApp({ channels }: IptvAppProps) {
 
   useEffect(() => {
     void preloadHls();
-    setSelectedChannel((current) => current ?? channels[0] ?? null);
-  }, [channels]);
+  }, []);
+
+  useEffect(() => {
+    setSelectedChannel((current) => {
+      if (current && isAvailable(current.id)) return current;
+      return availableChannels[0] ?? null;
+    });
+  }, [availableChannels, isAvailable]);
 
   const groups = useMemo(() => {
     const unique = new Set(channels.map((channel) => channel.group));
@@ -75,21 +93,23 @@ export function IptvApp({ channels }: IptvAppProps) {
 
   const groupCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const channel of channels) {
+    for (const channel of availableChannels) {
       counts.set(channel.group, (counts.get(channel.group) ?? 0) + 1);
     }
     return counts;
-  }, [channels]);
+  }, [availableChannels]);
 
   const fifaChannel = useMemo(() => {
-    const fifaChannels = channels.filter((channel) => /fifa/i.test(channel.name));
+    const fifaChannels = availableChannels.filter((channel) =>
+      /fifa/i.test(channel.name),
+    );
     return (
       fifaChannels.find((channel) => /fifa\s*plus/i.test(channel.name)) ??
       fifaChannels.find((channel) => /fifa\+/i.test(channel.name)) ??
       fifaChannels[0] ??
       null
     );
-  }, [channels]);
+  }, [availableChannels]);
 
   const sportsGroup = useMemo(
     () => groups.find((group) => group.toLowerCase() === "sports") ?? null,
@@ -98,14 +118,14 @@ export function IptvApp({ channels }: IptvAppProps) {
 
   const firstSportsChannel = useMemo(() => {
     if (!sportsGroup) return null;
-    return findTopSportsChannel(channels, sportsGroup);
-  }, [channels, sportsGroup]);
+    return findTopSportsChannel(availableChannels, sportsGroup);
+  }, [availableChannels, sportsGroup]);
 
   const filteredChannels = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
     return sortChannels(
-      channels.filter((channel) => {
+      availableChannels.filter((channel) => {
         const matchesGroup =
           activeGroup === "All" || channel.group === activeGroup;
         const matchesSearch =
@@ -116,7 +136,14 @@ export function IptvApp({ channels }: IptvAppProps) {
         return matchesGroup && matchesSearch;
       }),
     );
-  }, [activeGroup, channels, searchQuery]);
+  }, [activeGroup, availableChannels, searchQuery]);
+
+  const handlePlaybackResult = useCallback(
+    (channelId: string, ok: boolean) => {
+      reportPlayback(channelId, ok);
+    },
+    [reportPlayback],
+  );
 
   const handleSelectChannel = useCallback((channel: Channel) => {
     triggerSmartLink();
@@ -276,7 +303,11 @@ export function IptvApp({ channels }: IptvAppProps) {
 
       <div className="iptv-layout">
         <main className="iptv-main">
-          <VideoPlayer channel={selectedChannel} playbackKey={playbackKey} />
+          <VideoPlayer
+            channel={selectedChannel}
+            playbackKey={playbackKey}
+            onPlaybackResult={handlePlaybackResult}
+          />
         </main>
 
         {panelOpen && (
@@ -349,7 +380,7 @@ export function IptvApp({ channels }: IptvAppProps) {
                   onClick={() => handleSelectGroup("All")}
                 >
                   All
-                  <span>{channels.length}</span>
+                  <span>{availableChannels.length}</span>
                 </button>
                 {groups.map((group) => (
                   <button

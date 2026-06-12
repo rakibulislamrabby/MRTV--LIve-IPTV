@@ -72,9 +72,14 @@ function startPlayWatchdog(
 interface VideoPlayerProps {
   channel: Channel | null;
   playbackKey: number;
+  onPlaybackResult?: (channelId: string, ok: boolean) => void;
 }
 
-export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
+export function VideoPlayer({
+  channel,
+  playbackKey,
+  onPlaybackResult,
+}: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<HlsInstance | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "playing" | "error">(
@@ -251,12 +256,16 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
 
         const ok = await trySources();
         if (cancelled) return;
-        if (ok) return;
+        if (ok) {
+          onPlaybackResult?.(channel.id, true);
+          return;
+        }
       }
 
       if (!cancelled) {
         setStatus("error");
         setErrorMessage("Stream unavailable.");
+        onPlaybackResult?.(channel.id, false);
       }
     };
 
@@ -267,7 +276,7 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
       stopWatchdog();
       destroyHls(hlsRef);
     };
-  }, [channel, playbackKey]);
+  }, [channel, onPlaybackResult, playbackKey]);
 
   const isLoading = status === "loading";
 
