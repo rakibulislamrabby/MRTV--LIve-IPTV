@@ -1,11 +1,15 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { filterWorkingChannels } from "./validate-stream.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
 const playlistDir = path.join(root, "data/playlists");
 const outputPath = path.join(root, "generated/channels.json");
+const streamHealthPath = path.join(root, "generated/stream-health.json");
+
+const HEALTH_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const EXTRA_SPORTS_PLAYLISTS = [
   { file: "fifa-wrold-cupm3u", source: "sports-fifa-wc", sportsOnly: false },
@@ -276,6 +280,27 @@ function sortChannels(channels) {
   });
 }
 
+function buildSkyFallbackMap(channels) {
+  const urlsByName = new Map();
+
+  for (const channel of channels) {
+    const key = normalizeChannelName(channel.name);
+    const urls = urlsByName.get(key) ?? new Set();
+    urls.add(channel.url);
+    urlsByName.set(key, urls);
+  }
+
+  const fallbacks = new Map();
+  for (const [key, urls] of urlsByName) {
+    // Skip ambiguous names to avoid mapping backup from another channel.
+    if (urls.size !== 1) continue;
+    const [url] = [...urls];
+    if (url) fallbacks.set(key, url);
+  }
+
+  return fallbacks;
+}
+
 function attachFallback(channel, fallbacks) {
   const fallbackUrl = fallbacks.get(normalizeChannelName(channel.name));
 
@@ -284,6 +309,119 @@ function attachFallback(channel, fallbacks) {
     fallbackUrl:
       fallbackUrl && fallbackUrl !== channel.url ? fallbackUrl : undefined,
   };
+}
+
+function loadStreamHealthCache() {
+  if (!fs.existsSync(streamHealthPath)) return {};
+
+  try {
+    return JSON.parse(fs.readFileSync(streamHealthPath, "utf-8"));
+  } catch {
+    return {};
+  }
+}
+
+function saveStreamHealthCache(cache) {
+  fs.mkdirSync(path.dirname(streamHealthPath), { recursive: true });
+  fs.writeFileSync(streamHealthPath, JSON.stringify(cache, null, 2));
+}
+
+async function getWorkingUrlSet(channels) {
+  const cache = loadStreamHealthCache();
+  const now = Date.now();
+  const allUrls = [...new Set(
+    channels.flatMap((channel) => [channel.url, channel.fallbackUrl]).filter(Boolean),
+  )];
+
+  const staleOrMissing = allUrls.filter((url) => {
+    if (process.env.FORCE_STREAM_REVALIDATE === "1") return true;
+    const cached = cache[url];
+    if (!cached) return true;
+    return now - cached.checkedAt > HEALTH_CACHE_TTL_MS;
+  });
+
+  if (staleOrMissing.length > 0) {
+    console.log(`\nValidating ${staleOrMissing.length} stream URLs...`);
+    const probeItems = staleOrMissing.map((url, index) => ({
+      id: `probe-${index}`,
+      name: url,
+      url,
+      group: "Probe",
+      source: "aynaott",
+    }));
+    const workingItems = await filterWorkingChannels(probeItems, {
+      concurrency: 14,
+    });
+    const working = new Set(workingItems.map((item) => item.url));
+
+    if (
+      working.size === 0 &&
+      staleOrMissing.length >= 25 &&
+      process.env.FORCE_STRICT_STABLE !== "1"
+    ) {
+      console.warn(
+        "Stream probing returned 0 results. Keeping existing cache to avoid wiping channel catalog.",
+      );
+      const cachedWorking = new Set(
+        allUrls.filter((url) => cache[url]?.ok),
+      );
+      if (cachedWorking.size > 0) {
+        return cachedWorking;
+      }
+      return new Set(allUrls);
+    }
+
+    for (const url of staleOrMissing) {
+      cache[url] = { ok: working.has(url), checkedAt: now };
+    }
+
+    saveStreamHealthCache(cache);
+  }
+
+  const cachedWorking = new Set(allUrls.filter((url) => cache[url]?.ok));
+  if (
+    cachedWorking.size === 0 &&
+    allUrls.length > 0 &&
+    process.env.FORCE_STRICT_STABLE !== "1"
+  ) {
+    console.warn(
+      "No cached healthy streams found. Falling back to unfiltered channels for safety.",
+    );
+    return new Set(allUrls);
+  }
+
+  return cachedWorking;
+}
+
+function keepStableChannels(channels, workingUrls) {
+  const stable = [];
+
+  for (const channel of channels) {
+    if (workingUrls.has(channel.url)) {
+      stable.push(channel);
+      continue;
+    }
+
+    if (channel.fallbackUrl && workingUrls.has(channel.fallbackUrl)) {
+      stable.push({
+        ...channel,
+        url: channel.fallbackUrl,
+        fallbackUrl: undefined,
+      });
+      continue;
+    }
+
+    // Keep every PTV entry visible in Sports even when probe fails.
+    if (isPtvChannel(channel)) {
+      stable.push(channel);
+    }
+  }
+
+  return stable;
+}
+
+function isPtvChannel(channel) {
+  return /ptv/i.test(channel.name);
 }
 
 function getPlaylistMtime() {
@@ -325,14 +463,7 @@ async function buildChannelList() {
   const aynaChannels = parseM3U(aynaContent, "aynaott");
   const skyChannels = parseM3U(skyContent, "sky");
   const logoLookup = buildLogoLookup(aynaChannels);
-  const skyFallbacks = new Map();
-
-  for (const channel of skyChannels) {
-    const key = normalizeChannelName(channel.name);
-    if (!skyFallbacks.has(key)) {
-      skyFallbacks.set(key, channel.url);
-    }
-  }
+  const skyFallbacks = buildSkyFallbackMap(skyChannels);
 
   const baseChannels = aynaChannels.map((channel) =>
     attachFallback(channel, skyFallbacks),
@@ -361,7 +492,7 @@ async function buildChannelList() {
     console.log(`\n${playlist.file}: ${candidates.length} sports channels`);
 
     for (const channel of candidates) {
-      if (knownUrls.has(channel.url)) continue;
+      if (!isPtvChannel(channel) && knownUrls.has(channel.url)) continue;
       knownUrls.add(channel.url);
       extraChannels.push(
         attachLogo(
@@ -372,7 +503,28 @@ async function buildChannelList() {
     }
   }
 
-  return sortChannels([...baseChannels, ...extraChannels]);
+  const merged = sortChannels([...baseChannels, ...extraChannels]);
+  const workingUrls = await getWorkingUrlSet(merged);
+  let stable = keepStableChannels(merged, workingUrls);
+
+  const ptvChannels = merged.filter(isPtvChannel);
+  const stablePtvIds = new Set(stable.filter(isPtvChannel).map((channel) => channel.id));
+  for (const ptvChannel of ptvChannels) {
+    if (!stablePtvIds.has(ptvChannel.id)) {
+      stable.push(ptvChannel);
+      stablePtvIds.add(ptvChannel.id);
+    }
+  }
+
+  console.log(
+    `PTV channels kept: ${stable.filter(isPtvChannel).length}/${ptvChannels.length}`,
+  );
+  console.log(`Stable channels: ${stable.length}/${merged.length}`);
+  if (stable.length === 0 && merged.length > 0 && process.env.FORCE_STRICT_STABLE !== "1") {
+    console.warn("Stable set empty; returning full merged list to keep UI usable.");
+    return merged;
+  }
+  return sortChannels(stable);
 }
 
 const channels = await buildChannelList();

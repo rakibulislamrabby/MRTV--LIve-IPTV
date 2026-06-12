@@ -1,9 +1,6 @@
-const UPSTREAM_TIMEOUT_MS = 10_000;
+import { getUpstreamRequestHeaders } from "./stream-url";
 
-const UPSTREAM_HEADERS = {
-  "User-Agent": "Mozilla/5.0",
-  Accept: "*/*",
-};
+const UPSTREAM_TIMEOUT_MS = 12_000;
 
 export async function fetchUpstream(
   target: string,
@@ -17,7 +14,7 @@ export async function fetchUpstream(
       ...init,
       signal: controller.signal,
       headers: {
-        ...UPSTREAM_HEADERS,
+        ...getUpstreamRequestHeaders(target),
         ...(init.headers as Record<string, string> | undefined),
       },
       cache: "no-store",

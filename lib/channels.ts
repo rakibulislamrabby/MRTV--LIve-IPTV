@@ -1,12 +1,20 @@
 import fs from "fs";
 import path from "path";
 
+import bundledChannels from "../generated/channels.json";
+
 import { attachLogo, buildLogoLookup } from "./logos";
-import { isSportsChannel, normalizeChannelName, parseM3U, sortChannels } from "./m3u";
+import {
+  isSportsChannel,
+  normalizeChannelName,
+  parseM3U,
+  sortChannels,
+} from "./m3u";
 import type { Channel, ChannelSource } from "./types";
 
 const SKY_PLAYLIST = "Skym3u-176.m3u";
 const AYNA_PLAYLIST = "aynaott.m3u";
+const GENERATED_CHANNELS = path.join(process.cwd(), "generated/channels.json");
 
 const EXTRA_SPORTS_PLAYLISTS: Array<{
   file: string;
@@ -17,60 +25,57 @@ const EXTRA_SPORTS_PLAYLISTS: Array<{
   { file: "4-Update-New.m3u", source: "sports-new", sportsOnly: true },
 ];
 
-const GENERATED_CHANNELS = path.join(process.cwd(), "generated/channels.json");
-
 function getPlaylistDir(): string {
   return path.join(process.cwd(), "data/playlists");
 }
 
 function isPlaylistFile(filename: string): boolean {
-  if (filename.endsWith(".m3u")) return true;
-  if (filename === "fifa-wrold-cupm3u") return true;
-  return false;
+  return filename.endsWith(".m3u") || filename === "fifa-wrold-cupm3u";
+}
+
+function listPlaylistFiles(): string[] {
+  return fs.readdirSync(getPlaylistDir()).filter(isPlaylistFile);
 }
 
 function readPlaylist(filename: string): string {
   return fs.readFileSync(path.join(getPlaylistDir(), filename), "utf-8");
 }
 
-function listPlaylistFiles(): string[] {
-  return fs
-    .readdirSync(getPlaylistDir())
-    .filter(isPlaylistFile);
-}
-
 function getPlaylistMtime(): number {
   const playlistDir = getPlaylistDir();
+  const files = listPlaylistFiles();
+  if (files.length === 0) return 0;
   return Math.max(
-    ...listPlaylistFiles().map((file) =>
-      fs.statSync(path.join(playlistDir, file)).mtimeMs,
-    ),
+    ...files.map((file) => fs.statSync(path.join(playlistDir, file)).mtimeMs),
   );
 }
 
-export function getChannelById(id: string): Channel | null {
-  return getChannels().find((channel) => channel.id === id) ?? null;
-}
-
 function buildSkyFallbackMap(channels: Channel[]): Map<string, string> {
-  const fallbacks = new Map<string, string>();
+  const urlsByName = new Map<string, Set<string>>();
 
   for (const channel of channels) {
     const key = normalizeChannelName(channel.name);
-    if (!fallbacks.has(key)) {
-      fallbacks.set(key, channel.url);
+    const urls = urlsByName.get(key) ?? new Set<string>();
+    urls.add(channel.url);
+    urlsByName.set(key, urls);
+  }
+
+  // Ambiguous channel names in fallback playlists can map to wrong streams.
+  // Only keep fallback URLs for names that point to exactly one upstream URL.
+  const fallbacks = new Map<string, string>();
+  for (const [key, urls] of urlsByName) {
+    if (urls.size !== 1) continue;
+    const [url] = [...urls];
+    if (url) {
+      fallbacks.set(key, url);
     }
   }
 
   return fallbacks;
 }
 
-function attachFallback(
-  channel: Channel,
-  fallbacks: Map<string, string>,
-): Channel {
+function attachFallback(channel: Channel, fallbacks: Map<string, string>): Channel {
   const fallbackUrl = fallbacks.get(normalizeChannelName(channel.name));
-
   return {
     ...channel,
     fallbackUrl:
@@ -99,6 +104,10 @@ function parseExtraSportsPlaylists(): Channel[] {
   return channels;
 }
 
+function isPtvChannel(channel: Pick<Channel, "name">): boolean {
+  return /ptv/i.test(channel.name);
+}
+
 export function buildChannelList(): Channel[] {
   const aynaChannels = parseM3U(readPlaylist(AYNA_PLAYLIST), "aynaott");
   const skyChannels = parseM3U(readPlaylist(SKY_PLAYLIST), "sky");
@@ -111,7 +120,10 @@ export function buildChannelList(): Channel[] {
   );
   const knownUrls = new Set(baseChannels.map((channel) => channel.url));
   const extraChannels = extraSportsChannels
-    .filter((channel) => !knownUrls.has(channel.url))
+    .filter((channel) => {
+      if (isPtvChannel(channel)) return true;
+      return !knownUrls.has(channel.url);
+    })
     .map((channel) => attachFallback(channel, skyFallbacks))
     .map((channel) => attachLogo(channel, logoLookup));
 
@@ -129,7 +141,15 @@ function readGeneratedChannels(): Channel[] | null {
   return JSON.parse(fs.readFileSync(GENERATED_CHANNELS, "utf-8")) as Channel[];
 }
 
+function readBundledChannels(): Channel[] {
+  return sortChannels((bundledChannels as Channel[]).map((channel) => ({ ...channel })));
+}
+
 export function getChannels(): Channel[] {
+  if (process.env.NODE_ENV === "production") {
+    return readBundledChannels();
+  }
+
   const generated = readGeneratedChannels();
   if (generated) return generated;
 
@@ -141,6 +161,10 @@ export function getChannels(): Channel[] {
   const channels = buildChannelList();
   memoryCache = { mtime, channels };
   return channels;
+}
+
+export function getChannelById(id: string): Channel | null {
+  return getChannels().find((channel) => channel.id === id) ?? null;
 }
 
 export function writeGeneratedChannels(): number {

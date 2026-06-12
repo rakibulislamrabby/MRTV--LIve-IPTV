@@ -100,9 +100,10 @@ export function findPtvSportsChannel(
       /ptv\s*sports/i.test(channel.name),
   );
 
-  return (
-    matches.find((channel) => channel.source === "aynaott") ?? matches[0] ?? null
-  );
+  if (matches.length === 0) return null;
+
+  // Match the first PTV Sports shown in the Sports sidebar order.
+  return sortChannels(matches)[0] ?? null;
 }
 
 export function sortChannels<T extends SortableChannel>(channels: T[]): T[] {
