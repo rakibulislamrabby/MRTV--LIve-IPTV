@@ -4,8 +4,25 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(__dirname, "..");
-const publicDir = path.join(root, "public");
+const playlistDir = path.join(root, "data/playlists");
 const outputPath = path.join(root, "generated/channels.json");
+
+const EXTRA_SPORTS_PLAYLISTS = [
+  { file: "fifa-wrold-cupm3u", source: "sports-fifa-wc", sportsOnly: false },
+  { file: "4-Update-New.m3u", source: "sports-new", sportsOnly: true },
+];
+
+const SPORTS_SOURCES = new Set([
+  "sports",
+  "sports-fifa-wc",
+  "sports-new",
+]);
+
+function isPlaylistFile(filename) {
+  if (filename.endsWith(".m3u")) return true;
+  if (filename === "fifa-wrold-cupm3u") return true;
+  return false;
+}
 
 const FIFA_LOGO =
   "https://raw.githubusercontent.com/Rakib49/Rakibiptv/main/images%20(11).jpeg";
@@ -48,7 +65,7 @@ const BRAND_LOGOS = [
 ];
 
 const SPORTS_NAME_PATTERN =
-  /\b(sport|fifa|cricket|espn|bein|willow|tsn|nfl|nba|golf|fox sports|star sports|ptv sports|t[\s-]?sports|asports|tyc sports|tudn|euro tv|talk sport|marquee|sports grid|xtream sports|bahrain sports|dd sports|nbc sports|bleav|ktv sport|sports first|premier league|champions league|wwe|ufc|f1)\b/i;
+  /\b(sport|fifa|cricket|espn|bein|willow|tsn|nfl|nba|golf|fox sports|star sports|ptv sports|t[\s-]?sports|asports|tyc sports|tudn|euro\s*sport|euro tv|talk sport|marquee|sports grid|xtream sports|bahrain sports|dd sports|nbc sports|bleav|ktv sport|sports first|premier league|champions league|wwe|ufc|f1|world cup|win\s*\+?|tnt|hub sports|sky sport|dazn|tivibu|tabii|sport\s*klub|trt spor|cosmote|prima sport|ziggo|racing|combate|max sport|smart sport|s sport|hub sport|wimbledon|uefa|laliga|bundesliga|serie a|ligue 1|mlb|nhl|motogp)\b/i;
 
 function normalizeChannelName(name) {
   return name.toLowerCase().replace(/\s+/g, " ").trim();
@@ -111,10 +128,12 @@ function parseM3U(content, source) {
       const defaultGroup =
         source === "sky"
           ? "Sky Channels"
-          : source === "sports"
-            ? isSportsChannel(pending.name)
-              ? "Sports"
-              : "Others"
+          : SPORTS_SOURCES.has(source)
+            ? source === "sports-new"
+              ? isSportsChannel(pending.name)
+                ? "Sports"
+                : "Others"
+              : "Sports"
             : "Other";
       const group = pending.group?.trim() || defaultGroup;
       const url = decodeHtmlEntities(line);
@@ -211,8 +230,10 @@ function groupSortIndex(group) {
 }
 
 const SPORTS_TOP_PRIORITY = [
-  /t[\s-]?sports/i,
+  /star\s*sports\s*1\s*hd/i,
   /ptv\s*sports/i,
+  /star\s*sports/i,
+  /^t\s+sports\b/i,
   /fifa/i,
 ];
 
@@ -232,6 +253,10 @@ function sortChannels(channels) {
   return [...channels].sort((a, b) => {
     const groupDiff = groupSortIndex(a.group) - groupSortIndex(b.group);
     if (groupDiff !== 0) return groupDiff;
+
+    const backupDiff =
+      Number(Boolean(b.fallbackUrl)) - Number(Boolean(a.fallbackUrl));
+    if (backupDiff !== 0) return backupDiff;
 
     const priorityDiff =
       sportsShowPriority(a.name, a.group) -
@@ -261,13 +286,44 @@ function attachFallback(channel, fallbacks) {
   };
 }
 
-function buildChannelList() {
-  const aynaContent = fs.readFileSync(path.join(publicDir, "aynaott.m3u"), "utf-8");
-  const skyContent = fs.readFileSync(path.join(publicDir, "Skym3u-176.m3u"), "utf-8");
-  const sportsContent = fs.readFileSync(path.join(publicDir, "sports.m3u"), "utf-8");
+function getPlaylistMtime() {
+  return Math.max(
+    ...fs
+      .readdirSync(playlistDir)
+      .filter(isPlaylistFile)
+      .map((file) => fs.statSync(path.join(playlistDir, file)).mtimeMs),
+  );
+}
+
+function isBuildUpToDate() {
+  if (process.env.FORCE_CHANNELS_BUILD === "1") return false;
+  if (!fs.existsSync(outputPath)) return false;
+
+  const playlistMtime = getPlaylistMtime();
+  const channelsMtime = fs.statSync(outputPath).mtimeMs;
+
+  return channelsMtime >= playlistMtime;
+}
+
+if (isBuildUpToDate()) {
+  const existing = JSON.parse(fs.readFileSync(outputPath, "utf-8"));
+  console.log(
+    `Channels up to date (${existing.length} channels), skipping build.`,
+  );
+  process.exit(0);
+}
+
+async function buildChannelList() {
+  const aynaContent = fs.readFileSync(
+    path.join(playlistDir, "aynaott.m3u"),
+    "utf-8",
+  );
+  const skyContent = fs.readFileSync(
+    path.join(playlistDir, "Skym3u-176.m3u"),
+    "utf-8",
+  );
   const aynaChannels = parseM3U(aynaContent, "aynaott");
   const skyChannels = parseM3U(skyContent, "sky");
-  const sportsChannels = parseM3U(sportsContent, "sports");
   const logoLookup = buildLogoLookup(aynaChannels);
   const skyFallbacks = new Map();
 
@@ -282,15 +338,44 @@ function buildChannelList() {
     attachFallback(channel, skyFallbacks),
   );
   const knownUrls = new Set(baseChannels.map((channel) => channel.url));
-  const extraChannels = sportsChannels
-    .filter((channel) => !knownUrls.has(channel.url))
-    .map((channel) => attachFallback(channel, skyFallbacks))
-    .map((channel) => attachLogo(channel, logoLookup));
+  const extraChannels = [];
+
+  for (const playlist of EXTRA_SPORTS_PLAYLISTS) {
+    const playlistPath = path.join(playlistDir, playlist.file);
+    if (!fs.existsSync(playlistPath)) {
+      console.warn(`Skipping missing playlist: ${playlist.file}`);
+      continue;
+    }
+
+    const content = fs.readFileSync(playlistPath, "utf-8");
+    let candidates = parseM3U(content, playlist.source).filter(
+      (channel) => channel.group === "Sports",
+    );
+
+    if (playlist.sportsOnly) {
+      candidates = candidates.filter((channel) =>
+        isSportsChannel(channel.name),
+      );
+    }
+
+    console.log(`\n${playlist.file}: ${candidates.length} sports channels`);
+
+    for (const channel of candidates) {
+      if (knownUrls.has(channel.url)) continue;
+      knownUrls.add(channel.url);
+      extraChannels.push(
+        attachLogo(
+          attachFallback(channel, skyFallbacks),
+          logoLookup,
+        ),
+      );
+    }
+  }
 
   return sortChannels([...baseChannels, ...extraChannels]);
 }
 
-const channels = buildChannelList();
+const channels = await buildChannelList();
 fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, JSON.stringify(channels));
-console.log(`Generated ${channels.length} channels -> generated/channels.json`);
+console.log(`\nGenerated ${channels.length} channels -> generated/channels.json`);

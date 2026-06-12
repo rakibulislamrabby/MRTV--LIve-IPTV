@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import type { Channel } from "@/lib/types";
+import type { ClientChannel } from "@/lib/client-channel";
 
 import { ChannelItem } from "./ChannelItem";
 
@@ -11,9 +11,9 @@ const ITEM_HEIGHT = 58;
 const OVERSCAN = 10;
 
 interface ChannelListProps {
-  channels: Channel[];
+  channels: ClientChannel[];
   selectedChannelId: string | null | undefined;
-  onSelect: (channel: Channel) => void;
+  onSelect: (channel: ClientChannel) => void;
   className?: string;
 }
 

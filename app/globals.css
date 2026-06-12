@@ -1153,3 +1153,22 @@ input {
     font-size: 0.68rem;
   }
 }
+
+.iptv-loading {
+  align-items: center;
+  justify-content: center;
+}
+
+.iptv-loading-card {
+  padding: 1rem 1.4rem;
+  border-radius: 0.9rem;
+  border: 1px solid var(--border);
+  background: rgba(15, 22, 41, 0.92);
+  color: var(--muted);
+}
+
+html.devtools-open body {
+  filter: blur(10px);
+  pointer-events: none;
+  user-select: none;
+}

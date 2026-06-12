@@ -5,17 +5,19 @@ import { useEffect, useRef, useState } from "react";
 
 import {
   HLS_CONFIG,
+  isHlsPlaybackUrl,
   preloadHls,
   STREAM_TIMEOUT_MS,
   type HlsInstance,
 } from "@/lib/hls-loader";
-import type { Channel, ChannelSource } from "@/lib/types";
+import { getStreamPath, type ClientChannel } from "@/lib/client-channel";
+import type { ChannelSource } from "@/lib/types";
 
 import { ChannelLogo } from "./ChannelLogo";
 import { AppIcon } from "./icons";
 
-const MAX_AUTO_RETRIES = 3;
-const RETRY_DELAY_MS = 700;
+const MAX_AUTO_RETRIES = 1;
+const RETRY_DELAY_MS = 350;
 const PLAY_WATCHDOG_MS = 5000;
 const PLAY_WATCHDOG_INTERVAL_MS = 400;
 
@@ -70,16 +72,11 @@ function startPlayWatchdog(
 }
 
 interface VideoPlayerProps {
-  channel: Channel | null;
+  channel: ClientChannel | null;
   playbackKey: number;
-  onPlaybackResult?: (channelId: string, ok: boolean) => void;
 }
 
-export function VideoPlayer({
-  channel,
-  playbackKey,
-  onPlaybackResult,
-}: VideoPlayerProps) {
+export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<HlsInstance | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "playing" | "error">(
@@ -132,7 +129,7 @@ export function VideoPlayer({
         destroyHls(hlsRef);
         resetVideo(video);
 
-        const isHls = url.includes(".m3u8");
+        const isHls = isHlsPlaybackUrl(url);
         const isDash = url.endsWith(".mpd");
 
         if (isDash) {
@@ -200,7 +197,12 @@ export function VideoPlayer({
                 void attemptPlay();
               });
 
-              hls.on(Hls.Events.ERROR, () => {
+              hls.on(Hls.Events.ERROR, (...args: unknown[]) => {
+                const data = args[1] as { fatal?: boolean } | undefined;
+                if (data?.fatal) {
+                  finishWithCleanup(false);
+                  return;
+                }
                 if (!video.paused) return;
                 void attemptPlay();
               });
@@ -216,13 +218,13 @@ export function VideoPlayer({
 
     const trySources = async (): Promise<boolean> => {
       setActiveSource("aynaott");
-      const primaryOk = await playUrl(channel.url);
+      const primaryOk = await playUrl(getStreamPath(channel.id));
       if (cancelled) return false;
       if (primaryOk) return true;
 
-      if (channel.fallbackUrl) {
+      if (channel.hasBackup) {
         setActiveSource("sky");
-        const fallbackOk = await playUrl(channel.fallbackUrl);
+        const fallbackOk = await playUrl(getStreamPath(channel.id, true));
         if (cancelled) return false;
         if (fallbackOk) return true;
       }
@@ -256,16 +258,12 @@ export function VideoPlayer({
 
         const ok = await trySources();
         if (cancelled) return;
-        if (ok) {
-          onPlaybackResult?.(channel.id, true);
-          return;
-        }
+        if (ok) return;
       }
 
       if (!cancelled) {
         setStatus("error");
-        setErrorMessage("Stream unavailable.");
-        onPlaybackResult?.(channel.id, false);
+        setErrorMessage("Server issue. This stream is unavailable right now.");
       }
     };
 
@@ -276,7 +274,7 @@ export function VideoPlayer({
       stopWatchdog();
       destroyHls(hlsRef);
     };
-  }, [channel, onPlaybackResult, playbackKey]);
+  }, [channel, playbackKey]);
 
   const isLoading = status === "loading";
 
@@ -304,7 +302,7 @@ export function VideoPlayer({
                 <p>
                   {activeSource === "sky"
                     ? "Trying backup…"
-                    : "Loading stream…"}
+                    : "Wait some moment…"}
                 </p>
               </div>
             )}

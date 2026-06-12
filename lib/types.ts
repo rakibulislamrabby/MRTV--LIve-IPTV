@@ -1,4 +1,9 @@
-export type ChannelSource = "sky" | "aynaott" | "sports";
+export type ChannelSource =
+  | "sky"
+  | "aynaott"
+  | "sports"
+  | "sports-fifa-wc"
+  | "sports-new";
 
 export interface Channel {
   id: string;

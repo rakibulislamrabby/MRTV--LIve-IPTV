@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 
+import { AntiInspect } from "@/components/AntiInspect";
 import { PwaRegister } from "@/components/PwaRegister";
 import { AD_NETWORK_ORIGINS } from "@/lib/ads";
 
@@ -55,6 +56,7 @@ export default function RootLayout({
         <link rel="preload" href={HLS_SCRIPT} as="script" />
       </head>
       <body className="h-full" suppressHydrationWarning>
+        <AntiInspect />
         <PwaRegister />
         {children}
       </body>

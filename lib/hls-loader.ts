@@ -67,9 +67,21 @@ export function preloadHls(): Promise<HlsConstructor> {
 export const HLS_CONFIG = {
   enableWorker: true,
   lowLatencyMode: true,
-  maxBufferLength: 12,
-  maxMaxBufferLength: 30,
+  maxBufferLength: 6,
+  maxMaxBufferLength: 15,
   startFragPrefetch: true,
+  startLevel: -1,
+  fragLoadingTimeOut: 8_000,
+  manifestLoadingTimeOut: 8_000,
+  levelLoadingTimeOut: 8_000,
 };
 
-export const STREAM_TIMEOUT_MS = 12000;
+export const STREAM_TIMEOUT_MS = 8_000;
+
+export function isHlsPlaybackUrl(url: string): boolean {
+  return (
+    url.includes(".m3u8") ||
+    url.includes("/api/stream") ||
+    url.includes("/api/segment")
+  );
+}

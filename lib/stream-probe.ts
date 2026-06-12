@@ -1,81 +1,38 @@
-import {
-  HLS_CONFIG,
-  preloadHls,
-  STREAM_TIMEOUT_MS,
-  type HlsInstance,
-} from "./hls-loader";
-import type { Channel } from "./types";
+import { getStreamPath, type ClientChannel } from "./client-channel";
 
-const PROBE_TIMEOUT_MS = Math.min(STREAM_TIMEOUT_MS, 9000);
+const PROBE_TIMEOUT_MS = 4_500;
 
-function probeUrl(url: string): Promise<boolean> {
-  if (typeof window === "undefined") return Promise.resolve(true);
-  if (url.endsWith(".mpd")) return Promise.resolve(false);
+async function probeManifest(url: string): Promise<boolean> {
+  if (typeof window === "undefined") return true;
 
-  return new Promise((resolve) => {
-    const video = document.createElement("video");
-    video.muted = true;
-    video.playsInline = true;
-    video.preload = "auto";
+  const controller = new AbortController();
+  const timer = window.setTimeout(() => controller.abort(), PROBE_TIMEOUT_MS);
 
-    let settled = false;
-    let hls: HlsInstance | null = null;
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      cache: "no-store",
+    });
 
-    const finish = (ok: boolean) => {
-      if (settled) return;
-      settled = true;
-      window.clearTimeout(timer);
-      video.pause();
-      video.removeAttribute("src");
-      video.load();
-      hls?.destroy();
-      resolve(ok);
-    };
+    if (!response.ok) return false;
 
-    const timer = window.setTimeout(() => finish(false), PROBE_TIMEOUT_MS);
-    const isHls = url.includes(".m3u8");
-
-    const onPlaying = () => finish(true);
-    const onError = () => finish(false);
-
-    video.addEventListener("playing", onPlaying, { once: true });
-    video.addEventListener("error", onError, { once: true });
-
-    if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
-      video.src = url;
-      void video.play().catch(() => finish(false));
-      return;
-    }
-
-    if (isHls) {
-      void preloadHls()
-        .then((Hls) => {
-          if (!Hls.isSupported()) {
-            finish(false);
-            return;
-          }
-
-          hls = new Hls({ ...HLS_CONFIG, maxBufferLength: 4, maxMaxBufferLength: 8 });
-          hls.attachMedia(video);
-          hls.loadSource(url);
-
-          hls.on(Hls.Events.MANIFEST_PARSED, () => finish(true));
-          hls.on(Hls.Events.ERROR, (...args: unknown[]) => {
-            const data = args[1] as { fatal?: boolean } | undefined;
-            if (data?.fatal) finish(false);
-          });
-        })
-        .catch(() => finish(false));
-      return;
-    }
-
-    video.src = url;
-    void video.play().catch(() => finish(false));
-  });
+    const sample = (await response.text()).slice(0, 2048);
+    return (
+      sample.includes("#EXTM3U") ||
+      sample.includes("#EXTINF") ||
+      sample.includes("#EXT-X-STREAM-INF")
+    );
+  } catch {
+    return false;
+  } finally {
+    window.clearTimeout(timer);
+  }
 }
 
-export async function probeChannel(channel: Channel): Promise<boolean> {
-  if (await probeUrl(channel.url)) return true;
-  if (channel.fallbackUrl && (await probeUrl(channel.fallbackUrl))) return true;
+export async function probeChannel(channel: ClientChannel): Promise<boolean> {
+  if (await probeManifest(getStreamPath(channel.id))) return true;
+  if (channel.hasBackup && (await probeManifest(getStreamPath(channel.id, true)))) {
+    return true;
+  }
   return false;
 }

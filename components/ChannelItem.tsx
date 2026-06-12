@@ -3,15 +3,15 @@
 import { CircleDot } from "lucide-react";
 import { memo } from "react";
 
-import type { Channel } from "@/lib/types";
+import type { ClientChannel } from "@/lib/client-channel";
 
 import { ChannelLogo } from "./ChannelLogo";
 import { AppIcon } from "./icons";
 
 interface ChannelItemProps {
-  channel: Channel;
+  channel: ClientChannel;
   isActive: boolean;
-  onSelect: (channel: Channel) => void;
+  onSelect: (channel: ClientChannel) => void;
 }
 
 export const ChannelItem = memo(function ChannelItem({
@@ -36,7 +36,7 @@ export const ChannelItem = memo(function ChannelItem({
           <span className="channel-name">{channel.name}</span>
           <span className="channel-meta">
             {channel.group}
-            {channel.fallbackUrl && (
+            {channel.hasBackup && (
               <span className="backup-tag">Backup</span>
             )}
           </span>
