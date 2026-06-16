@@ -79,7 +79,8 @@ export function IptvApp() {
       .then((data) => {
         if (cancelled) return;
         setChannels(data);
-        setSelectedChannel((current) => current ?? data[0] ?? null);
+        const featured = data.find((channel) => channel.isFeatured);
+        setSelectedChannel((current) => current ?? featured ?? data[0] ?? null);
       })
       .catch(() => {
         if (!cancelled) setChannels([]);
@@ -106,15 +107,25 @@ export function IptvApp() {
     return counts;
   }, [channels]);
 
-  const worldCupChannel = useMemo(
-    () => findPtvSportsChannel(channels),
-    [channels],
-  );
+  const sportsGroup = useMemo(() => {
+    const exact = groups.find((group) => group.toLowerCase() === "sports");
+    if (exact) return exact;
+    return groups.find((group) => /sports/i.test(group)) ?? groups[0] ?? null;
+  }, [groups]);
 
-  const sportsGroup = useMemo(
-    () => groups.find((group) => group.toLowerCase() === "sports") ?? null,
-    [groups],
-  );
+  const worldCupChannel = useMemo(() => {
+    const featured = channels.find((channel) => channel.isFeatured);
+    if (featured) return featured;
+
+    const ptv = findPtvSportsChannel(channels);
+    if (ptv) return ptv;
+    return (
+      channels.find((channel) => /fifa/i.test(channel.name)) ??
+      channels.find((channel) => channel.group === sportsGroup) ??
+      channels[0] ??
+      null
+    );
+  }, [channels, sportsGroup]);
 
   const firstSportsChannel = useMemo(() => {
     if (!sportsGroup) return null;
@@ -193,8 +204,8 @@ export function IptvApp() {
   }, [handleSelectGroup]);
 
   const handlePlayWorldCup = useCallback(() => {
-    if (!worldCupChannel || !sportsGroup) return;
-    setActiveGroup(sportsGroup);
+    if (!worldCupChannel) return;
+    setActiveGroup("All");
     setSearchQuery("");
     setSelectedChannel(worldCupChannel);
     setPlaybackKey((key) => key + 1);
@@ -204,7 +215,7 @@ export function IptvApp() {
     if (typeof window !== "undefined" && window.innerWidth < 1180) {
       scrollToMobileChannels();
     }
-  }, [scrollToMobileChannels, sportsGroup, worldCupChannel]);
+  }, [scrollToMobileChannels, worldCupChannel]);
 
   const handleButtonPopunder = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {

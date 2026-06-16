@@ -7,6 +7,7 @@ export interface ClientChannel {
   group: string;
   source: ChannelSource;
   hasBackup?: boolean;
+  isFeatured?: boolean;
 }
 
 export function getStreamPath(channelId: string, backup = false): string {

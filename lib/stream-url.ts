@@ -42,6 +42,11 @@ export function getUpstreamRequestHeaders(target: string): Record<string, string
       return headers;
     }
 
+    if (host.includes("streamhostingcdn.top")) {
+      headers.Referer = `${parsed.protocol}//${parsed.host}/`;
+      return headers;
+    }
+
     if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) {
       headers.Referer = `${parsed.protocol}//${parsed.host}/`;
       return headers;

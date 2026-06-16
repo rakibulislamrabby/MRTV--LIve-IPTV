@@ -1,4 +1,5 @@
 export type ChannelSource =
+  | "fifa-channel"
   | "sky"
   | "aynaott"
   | "sports"

@@ -3,131 +3,32 @@ import path from "path";
 
 import bundledChannels from "../generated/channels.json";
 
-import { attachLogo, buildLogoLookup } from "./logos";
-import {
-  isSportsChannel,
-  normalizeChannelName,
-  parseM3U,
-  sortChannels,
-} from "./m3u";
-import type { Channel, ChannelSource } from "./types";
+import { pinFeaturedChannel } from "./featured-channel";
+import { parseFifaPlaylist } from "./fifa-playlist";
+import { sortChannels } from "./m3u";
+import type { Channel } from "./types";
 
-const SKY_PLAYLIST = "Skym3u-176.m3u";
-const AYNA_PLAYLIST = "aynaott.m3u";
+const FIFA_PLAYLIST = "fifa-channel.m3u";
 const GENERATED_CHANNELS = path.join(process.cwd(), "generated/channels.json");
 
-const EXTRA_SPORTS_PLAYLISTS: Array<{
-  file: string;
-  source: ChannelSource;
-  sportsOnly: boolean;
-}> = [
-  { file: "fifa-wrold-cupm3u", source: "sports-fifa-wc", sportsOnly: false },
-  { file: "4-Update-New.m3u", source: "sports-new", sportsOnly: true },
-];
-
-function getPlaylistDir(): string {
-  return path.join(process.cwd(), "data/playlists");
-}
-
-function isPlaylistFile(filename: string): boolean {
-  return filename.endsWith(".m3u") || filename === "fifa-wrold-cupm3u";
-}
-
-function listPlaylistFiles(): string[] {
-  return fs.readdirSync(getPlaylistDir()).filter(isPlaylistFile);
-}
-
-function readPlaylist(filename: string): string {
-  return fs.readFileSync(path.join(getPlaylistDir(), filename), "utf-8");
+function getPlaylistPath(): string {
+  return path.join(process.cwd(), "data/playlists", FIFA_PLAYLIST);
 }
 
 function getPlaylistMtime(): number {
-  const playlistDir = getPlaylistDir();
-  const files = listPlaylistFiles();
-  if (files.length === 0) return 0;
-  return Math.max(
-    ...files.map((file) => fs.statSync(path.join(playlistDir, file)).mtimeMs),
-  );
-}
-
-function buildSkyFallbackMap(channels: Channel[]): Map<string, string> {
-  const urlsByName = new Map<string, Set<string>>();
-
-  for (const channel of channels) {
-    const key = normalizeChannelName(channel.name);
-    const urls = urlsByName.get(key) ?? new Set<string>();
-    urls.add(channel.url);
-    urlsByName.set(key, urls);
-  }
-
-  // Ambiguous channel names in fallback playlists can map to wrong streams.
-  // Only keep fallback URLs for names that point to exactly one upstream URL.
-  const fallbacks = new Map<string, string>();
-  for (const [key, urls] of urlsByName) {
-    if (urls.size !== 1) continue;
-    const [url] = [...urls];
-    if (url) {
-      fallbacks.set(key, url);
-    }
-  }
-
-  return fallbacks;
-}
-
-function attachFallback(channel: Channel, fallbacks: Map<string, string>): Channel {
-  const fallbackUrl = fallbacks.get(normalizeChannelName(channel.name));
-  return {
-    ...channel,
-    fallbackUrl:
-      fallbackUrl && fallbackUrl !== channel.url ? fallbackUrl : undefined,
-  };
-}
-
-function parseExtraSportsPlaylists(): Channel[] {
-  const channels: Channel[] = [];
-
-  for (const playlist of EXTRA_SPORTS_PLAYLISTS) {
-    const playlistPath = path.join(getPlaylistDir(), playlist.file);
-    if (!fs.existsSync(playlistPath)) continue;
-
-    let parsed = parseM3U(readPlaylist(playlist.file), playlist.source).filter(
-      (channel) => channel.group === "Sports",
-    );
-
-    if (playlist.sportsOnly) {
-      parsed = parsed.filter((channel) => isSportsChannel(channel.name));
-    }
-
-    channels.push(...parsed);
-  }
-
-  return channels;
-}
-
-function isPtvChannel(channel: Pick<Channel, "name">): boolean {
-  return /ptv/i.test(channel.name);
+  const playlistPath = getPlaylistPath();
+  if (!fs.existsSync(playlistPath)) return 0;
+  return fs.statSync(playlistPath).mtimeMs;
 }
 
 export function buildChannelList(): Channel[] {
-  const aynaChannels = parseM3U(readPlaylist(AYNA_PLAYLIST), "aynaott");
-  const skyChannels = parseM3U(readPlaylist(SKY_PLAYLIST), "sky");
-  const extraSportsChannels = parseExtraSportsPlaylists();
-  const skyFallbacks = buildSkyFallbackMap(skyChannels);
-  const logoLookup = buildLogoLookup(aynaChannels);
+  const playlistPath = getPlaylistPath();
+  if (!fs.existsSync(playlistPath)) {
+    return [];
+  }
 
-  const baseChannels = aynaChannels.map((channel) =>
-    attachFallback(channel, skyFallbacks),
-  );
-  const knownUrls = new Set(baseChannels.map((channel) => channel.url));
-  const extraChannels = extraSportsChannels
-    .filter((channel) => {
-      if (isPtvChannel(channel)) return true;
-      return !knownUrls.has(channel.url);
-    })
-    .map((channel) => attachFallback(channel, skyFallbacks))
-    .map((channel) => attachLogo(channel, logoLookup));
-
-  return sortChannels([...baseChannels, ...extraChannels]);
+  const content = fs.readFileSync(playlistPath, "utf-8");
+  return pinFeaturedChannel(sortChannels(parseFifaPlaylist(content)));
 }
 
 let memoryCache: { mtime: number; channels: Channel[] } | null = null;

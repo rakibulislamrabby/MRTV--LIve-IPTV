@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import type { ClientChannel } from "@/lib/client-channel";
 import { getChannels } from "@/lib/channels";
+import { isFeaturedStreamUrl } from "@/lib/featured-channel";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,7 @@ export async function GET() {
       group: channel.group,
       source: channel.source,
       hasBackup: Boolean(channel.fallbackUrl),
+      isFeatured: isFeaturedStreamUrl(channel.url),
     }),
   );
 

@@ -44,8 +44,19 @@ export function normalizeChannelName(name: string): string {
 }
 
 export const GROUP_PRIORITY = [
-  "Bangla",
   "Sports",
+  "Live Sports",
+  "Argentina",
+  "Mexico",
+  "USA",
+  "Latino",
+  "ESPN",
+  "Fox",
+  "beIN",
+  "DAZN",
+  "Sky",
+  "Eastern Europe",
+  "Bangla",
   "News",
   "Entertainment",
   "Kids",

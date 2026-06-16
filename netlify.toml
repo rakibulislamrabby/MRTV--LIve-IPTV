@@ -6,4 +6,4 @@
 
 [functions]
   node_bundler = "esbuild"
-  included_files = ["generated/**", "data/playlists/**"]
+  included_files = ["generated/**", "data/playlists/fifa-channel.m3u"]

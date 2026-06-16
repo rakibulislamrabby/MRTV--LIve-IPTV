@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="T Sports">
+  <rect width="120" height="120" rx="18" fill="#0b6b3a"/>
+  <rect x="18" y="18" width="84" height="84" rx="12" fill="#ffffff"/>
+  <text x="60" y="78" text-anchor="middle" fill="#0b6b3a" font-family="Arial,Helvetica,sans-serif" font-size="56" font-weight="900">T</text>
+  <text x="60" y="108" text-anchor="middle" fill="#ffffff" font-family="Arial,Helvetica,sans-serif" font-size="14" font-weight="700" letter-spacing="2">SPORTS</text>
+</svg>
