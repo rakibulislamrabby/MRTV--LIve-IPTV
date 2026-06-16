@@ -43,7 +43,6 @@ async function proxyTarget(
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
-  const useFallback = searchParams.get("fb") === "1";
 
   if (!id) {
     return new NextResponse("Bad request", { status: 400 });
@@ -54,7 +53,7 @@ export async function GET(request: Request) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  const targets = getPlaybackUrls(channel, useFallback);
+  const targets = getPlaybackUrls(channel);
   if (targets.length === 0) {
     return new NextResponse("Stream not available on this host", { status: 502 });
   }

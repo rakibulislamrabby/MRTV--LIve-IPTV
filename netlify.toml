@@ -6,6 +6,7 @@
 
 [functions]
   node_bundler = "esbuild"
+  included_files = ["data/playlists/fifa-channel.m3u8"]
 
 [functions."___netlify-server-handler"]
   timeout = 26

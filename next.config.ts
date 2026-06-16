@@ -22,9 +22,9 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
-    "/api/catalog": ["./lib/**/*"],
-    "/api/stream": ["./lib/**/*"],
-    "/api/segment": ["./lib/**/*"],
+    "/api/catalog": ["./data/playlists/**/*", "./lib/**/*"],
+    "/api/stream": ["./data/playlists/**/*", "./lib/**/*"],
+    "/api/segment": ["./data/playlists/**/*", "./lib/**/*"],
   },
   async headers() {
     return [
