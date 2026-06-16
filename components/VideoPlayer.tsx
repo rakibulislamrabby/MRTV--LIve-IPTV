@@ -10,16 +10,10 @@ import {
   STREAM_TIMEOUT_MS,
   type HlsInstance,
 } from "@/lib/hls-loader";
-import { getStreamPath, type ClientChannel } from "@/lib/client-channel";
-import type { ChannelSource } from "@/lib/types";
+import type { ClientChannel } from "@/lib/client-channel";
 
 import { ChannelLogo } from "./ChannelLogo";
 import { AppIcon } from "./icons";
-
-const MAX_AUTO_RETRIES = 1;
-const RETRY_DELAY_MS = 350;
-const PLAY_WATCHDOG_MS = 5000;
-const PLAY_WATCHDOG_INTERVAL_MS = 400;
 
 function destroyHls(hlsRef: React.RefObject<HlsInstance | null>) {
   if (hlsRef.current) {
@@ -32,10 +26,6 @@ function resetVideo(video: HTMLVideoElement) {
   video.pause();
   video.removeAttribute("src");
   video.load();
-}
-
-function wait(ms: number): Promise<void> {
-  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 async function forcePlay(video: HTMLVideoElement): Promise<boolean> {
@@ -51,26 +41,6 @@ async function forcePlay(video: HTMLVideoElement): Promise<boolean> {
   }
 }
 
-function startPlayWatchdog(
-  video: HTMLVideoElement,
-  isCancelled: () => boolean,
-): () => void {
-  const startedAt = Date.now();
-
-  const intervalId = window.setInterval(() => {
-    if (isCancelled() || Date.now() - startedAt > PLAY_WATCHDOG_MS) {
-      window.clearInterval(intervalId);
-      return;
-    }
-
-    if (video.paused && video.readyState >= 2) {
-      void forcePlay(video);
-    }
-  }, PLAY_WATCHDOG_INTERVAL_MS);
-
-  return () => window.clearInterval(intervalId);
-}
-
 interface VideoPlayerProps {
   channel: ClientChannel | null;
   playbackKey: number;
@@ -82,7 +52,6 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "playing" | "error">(
     "idle",
   );
-  const [activeSource, setActiveSource] = useState<ChannelSource>("aynaott");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -90,147 +59,11 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
     if (!video || !channel) {
       setStatus("idle");
       setErrorMessage(null);
-      setActiveSource("aynaott");
       return;
     }
 
     let cancelled = false;
-    let stopWatchdog = () => {};
-
-    const isCancelled = () => cancelled;
-
-    const markPlaying = () => {
-      if (!cancelled) {
-        setStatus("playing");
-      }
-    };
-
-    const playUrl = (url: string): Promise<boolean> =>
-      new Promise((resolve) => {
-        if (cancelled) {
-          resolve(false);
-          return;
-        }
-
-        let settled = false;
-        const finish = (success: boolean) => {
-          if (settled || cancelled) return;
-          settled = true;
-          window.clearTimeout(timeoutId);
-          stopWatchdog();
-          resolve(success);
-        };
-
-        const timeoutId = window.setTimeout(
-          () => finish(false),
-          STREAM_TIMEOUT_MS,
-        );
-
-        destroyHls(hlsRef);
-        resetVideo(video);
-
-        const isHls = isHlsPlaybackUrl(url);
-        const isDash = url.endsWith(".mpd");
-
-        if (isDash) {
-          finish(false);
-          return;
-        }
-
-        const onNativePlaying = () => {
-          markPlaying();
-          finishWithCleanup(true);
-        };
-
-        const onNativeError = () => finishWithCleanup(false);
-
-        const onCanPlay = () => {
-          if (!video.paused) return;
-          void attemptPlay();
-        };
-
-        const cleanupListeners = () => {
-          video.removeEventListener("playing", onNativePlaying);
-          video.removeEventListener("error", onNativeError);
-          video.removeEventListener("canplay", onCanPlay);
-        };
-
-        const finishWithCleanup = (success: boolean) => {
-          cleanupListeners();
-          finish(success);
-        };
-
-        const attemptPlay = async () => {
-          const played = await forcePlay(video);
-          if (played) {
-            markPlaying();
-            finishWithCleanup(true);
-          }
-        };
-
-        video.addEventListener("playing", onNativePlaying);
-        video.addEventListener("error", onNativeError, { once: true });
-        video.addEventListener("canplay", onCanPlay);
-
-        stopWatchdog = startPlayWatchdog(video, isCancelled);
-
-        if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
-          video.src = url;
-          void attemptPlay();
-          return;
-        }
-
-        if (isHls) {
-          void preloadHls()
-            .then((Hls) => {
-              if (cancelled || !Hls.isSupported()) {
-                finish(false);
-                return;
-              }
-
-              const hls = new Hls(HLS_CONFIG);
-              hlsRef.current = hls;
-              hls.attachMedia(video);
-              hls.loadSource(url);
-
-              hls.on(Hls.Events.MANIFEST_PARSED, () => {
-                void attemptPlay();
-              });
-
-              hls.on(Hls.Events.ERROR, (...args: unknown[]) => {
-                const data = args[1] as { fatal?: boolean } | undefined;
-                if (data?.fatal) {
-                  finishWithCleanup(false);
-                  return;
-                }
-                if (!video.paused) return;
-                void attemptPlay();
-              });
-            })
-            .catch(() => finish(false));
-
-          return;
-        }
-
-        video.src = url;
-        void attemptPlay();
-      });
-
-    const trySources = async (): Promise<boolean> => {
-      setActiveSource("aynaott");
-      const primaryOk = await playUrl(getStreamPath(channel.id));
-      if (cancelled) return false;
-      if (primaryOk) return true;
-
-      if (channel.hasBackup) {
-        setActiveSource("sky");
-        const fallbackOk = await playUrl(getStreamPath(channel.id, true));
-        if (cancelled) return false;
-        if (fallbackOk) return true;
-      }
-
-      return false;
-    };
+    const url = channel.streamUrl;
 
     const startPlayback = async () => {
       setStatus("loading");
@@ -248,30 +81,81 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
 
       if (cancelled) return;
 
-      for (let attempt = 0; attempt <= MAX_AUTO_RETRIES; attempt += 1) {
-        if (cancelled) return;
+      destroyHls(hlsRef);
+      resetVideo(video);
 
-        if (attempt > 0) {
-          await wait(RETRY_DELAY_MS);
-          if (cancelled) return;
+      const isHls = isHlsPlaybackUrl(url);
+      const timeoutId = window.setTimeout(() => {
+        if (!cancelled) {
+          setStatus("error");
+          setErrorMessage("This stream is unavailable right now.");
         }
+      }, STREAM_TIMEOUT_MS);
 
-        const ok = await trySources();
-        if (cancelled) return;
-        if (ok) return;
+      const markPlaying = () => {
+        if (!cancelled) {
+          window.clearTimeout(timeoutId);
+          setStatus("playing");
+        }
+      };
+
+      const markError = () => {
+        if (!cancelled) {
+          window.clearTimeout(timeoutId);
+          setStatus("error");
+          setErrorMessage("This stream is unavailable right now.");
+        }
+      };
+
+      const attemptPlay = async () => {
+        const played = await forcePlay(video);
+        if (played) markPlaying();
+      };
+
+      video.addEventListener("playing", markPlaying, { once: true });
+      video.addEventListener("error", markError, { once: true });
+
+      if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
+        video.src = url;
+        void attemptPlay();
+        return;
       }
 
-      if (!cancelled) {
-        setStatus("error");
-        setErrorMessage("Server issue. This stream is unavailable right now.");
+      if (isHls) {
+        try {
+          const Hls = await preloadHls();
+          if (cancelled || !Hls.isSupported()) {
+            markError();
+            return;
+          }
+
+          const hls = new Hls(HLS_CONFIG);
+          hlsRef.current = hls;
+          hls.attachMedia(video);
+          hls.loadSource(url);
+
+          hls.on(Hls.Events.MANIFEST_PARSED, () => {
+            void attemptPlay();
+          });
+
+          hls.on(Hls.Events.ERROR, (...args: unknown[]) => {
+            const data = args[1] as { fatal?: boolean } | undefined;
+            if (data?.fatal) markError();
+          });
+        } catch {
+          markError();
+        }
+        return;
       }
+
+      video.src = url;
+      void attemptPlay();
     };
 
     void startPlayback();
 
     return () => {
       cancelled = true;
-      stopWatchdog();
       destroyHls(hlsRef);
     };
   }, [channel, playbackKey]);
@@ -299,11 +183,7 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
                   size={40}
                   className="player-spinner-icon"
                 />
-                <p>
-                  {activeSource === "sky"
-                    ? "Trying backup…"
-                    : "Wait some moment…"}
-                </p>
+                <p>Wait some moment…</p>
               </div>
             )}
             {status === "error" && (
@@ -333,15 +213,7 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
             />
             <div>
               <h2>{channel.name}</h2>
-              <p>
-                {channel.group}
-                {activeSource === "sky" ? (
-                  <>
-                    {" · "}
-                    <span className="source-badge source-sky">Backup</span>
-                  </>
-                ) : null}
-              </p>
+              <p>{channel.group}</p>
             </div>
           </div>
         </div>

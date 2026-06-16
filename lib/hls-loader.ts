@@ -79,9 +79,5 @@ export const HLS_CONFIG = {
 export const STREAM_TIMEOUT_MS = 22_000;
 
 export function isHlsPlaybackUrl(url: string): boolean {
-  return (
-    url.includes(".m3u8") ||
-    url.includes("/api/stream") ||
-    url.includes("/api/segment")
-  );
+  return url.includes(".m3u8") || url.includes(".m3u");
 }

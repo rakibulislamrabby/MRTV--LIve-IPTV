@@ -11,8 +11,7 @@ const HLS_SCRIPT =
 
 export const metadata: Metadata = {
   title: "Dofadar Tv | Live IPTV",
-  description:
-    "Watch live TV channels from Sky and AynaOTT playlists in one place.",
+  description: "Watch live sports channels in one place.",
   applicationName: "Dofadar Tv",
   appleWebApp: {
     capable: true,

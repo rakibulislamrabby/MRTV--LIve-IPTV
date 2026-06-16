@@ -17,19 +17,15 @@ import {
   triggerSmartLink,
 } from "@/lib/ads";
 import { preloadHls } from "@/lib/hls-loader";
-import type { ClientChannel } from "@/lib/client-channel";
-import {
-  findPtvSportsChannel,
-  findTopSportsChannel,
-  GROUP_PRIORITY,
-  sortChannels,
-} from "@/lib/m3u";
+import { CHANNELS, type ClientChannel } from "@/lib/client-channel";
 
 import { AdBanner } from "./AdBanner";
 import { BrandLogo } from "./BrandLogo";
 import { AppIcon } from "./icons";
 import { ChannelList } from "./ChannelList";
 import { VideoPlayer } from "./VideoPlayer";
+
+const GROUP_PRIORITY = ["Sports", "Argentina"];
 
 function sortGroups(groups: string[]): string[] {
   return [...groups].sort((a, b) => {
@@ -46,19 +42,23 @@ function sortGroups(groups: string[]): string[] {
   });
 }
 
+const featuredChannel =
+  CHANNELS.find((channel) => channel.isFeatured) ?? CHANNELS[0] ?? null;
+
 export function IptvApp() {
-  const [channels, setChannels] = useState<ClientChannel[]>([]);
-  const [catalogLoading, setCatalogLoading] = useState(true);
   const [selectedChannel, setSelectedChannel] = useState<ClientChannel | null>(
-    null,
+    featuredChannel,
   );
   const [playbackKey, setPlaybackKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeGroup, setActiveGroup] = useState<string>("All");
   const [panelOpen, setPanelOpen] = useState(false);
   const [categoriesOpen, setCategoriesOpen] = useState(false);
-  const [mobileChannelsOpen, setMobileChannelsOpen] = useState(true);
   const panelRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    void preloadHls();
+  }, []);
 
   const scrollToMobileChannels = useCallback(() => {
     requestAnimationFrame(() => {
@@ -66,88 +66,43 @@ export function IptvApp() {
     });
   }, []);
 
-  useEffect(() => {
-    void preloadHls();
-
-    let cancelled = false;
-
-    void fetch("/api/catalog", { cache: "no-store" })
-      .then((response) => {
-        if (!response.ok) throw new Error("Failed to load channels");
-        return response.json() as Promise<ClientChannel[]>;
-      })
-      .then((data) => {
-        if (cancelled) return;
-        setChannels(data);
-        const featured = data.find((channel) => channel.isFeatured);
-        setSelectedChannel((current) => current ?? featured ?? data[0] ?? null);
-      })
-      .catch(() => {
-        if (!cancelled) setChannels([]);
-      })
-      .finally(() => {
-        if (!cancelled) setCatalogLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   const groups = useMemo(() => {
-    const unique = new Set(channels.map((channel) => channel.group));
+    const unique = new Set(CHANNELS.map((channel) => channel.group));
     return sortGroups([...unique]);
-  }, [channels]);
+  }, []);
 
   const groupCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const channel of channels) {
+    for (const channel of CHANNELS) {
       counts.set(channel.group, (counts.get(channel.group) ?? 0) + 1);
     }
     return counts;
-  }, [channels]);
+  }, []);
 
-  const sportsGroup = useMemo(() => {
-    const exact = groups.find((group) => group.toLowerCase() === "sports");
-    if (exact) return exact;
-    return groups.find((group) => /sports/i.test(group)) ?? groups[0] ?? null;
-  }, [groups]);
-
-  const worldCupChannel = useMemo(() => {
-    const featured = channels.find((channel) => channel.isFeatured);
-    if (featured) return featured;
-
-    const ptv = findPtvSportsChannel(channels);
-    if (ptv) return ptv;
-    return (
-      channels.find((channel) => /fifa/i.test(channel.name)) ??
-      channels.find((channel) => channel.group === sportsGroup) ??
-      channels[0] ??
-      null
-    );
-  }, [channels, sportsGroup]);
+  const sportsGroup = useMemo(
+    () => groups.find((group) => group.toLowerCase() === "sports") ?? null,
+    [groups],
+  );
 
   const firstSportsChannel = useMemo(() => {
     if (!sportsGroup) return null;
-    return findTopSportsChannel(channels, sportsGroup);
-  }, [channels, sportsGroup]);
+    return CHANNELS.find((channel) => channel.group === sportsGroup) ?? null;
+  }, [sportsGroup]);
 
   const filteredChannels = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    return sortChannels(
-      channels.filter((channel) => {
-        const matchesGroup =
-          activeGroup === "All" || channel.group === activeGroup;
-        const matchesSearch =
-          !query ||
-          channel.name.toLowerCase().includes(query) ||
-          channel.group.toLowerCase().includes(query);
+    return CHANNELS.filter((channel) => {
+      const matchesGroup =
+        activeGroup === "All" || channel.group === activeGroup;
+      const matchesSearch =
+        !query ||
+        channel.name.toLowerCase().includes(query) ||
+        channel.group.toLowerCase().includes(query);
 
-        return matchesGroup && matchesSearch;
-      }),
-    );
-  }, [activeGroup, channels, searchQuery]);
+      return matchesGroup && matchesSearch;
+    });
+  }, [activeGroup, searchQuery]);
 
   const handleSelectChannel = useCallback((channel: ClientChannel) => {
     triggerSmartLink();
@@ -164,7 +119,6 @@ export function IptvApp() {
     (group: string) => {
       setActiveGroup(group);
       setCategoriesOpen(false);
-      setMobileChannelsOpen(true);
 
       if (typeof window !== "undefined" && window.innerWidth < 1180) {
         scrollToMobileChannels();
@@ -192,7 +146,6 @@ export function IptvApp() {
     setSelectedChannel(firstSportsChannel);
     setPlaybackKey((key) => key + 1);
     setPanelOpen(false);
-    setMobileChannelsOpen(true);
 
     if (typeof window !== "undefined" && window.innerWidth < 1180) {
       scrollToMobileChannels();
@@ -203,19 +156,18 @@ export function IptvApp() {
     handleSelectGroup("All");
   }, [handleSelectGroup]);
 
-  const handlePlayWorldCup = useCallback(() => {
-    if (!worldCupChannel) return;
+  const handlePlayFeatured = useCallback(() => {
+    if (!featuredChannel) return;
     setActiveGroup("All");
     setSearchQuery("");
-    setSelectedChannel(worldCupChannel);
+    setSelectedChannel(featuredChannel);
     setPlaybackKey((key) => key + 1);
     setPanelOpen(false);
-    setMobileChannelsOpen(true);
 
     if (typeof window !== "undefined" && window.innerWidth < 1180) {
       scrollToMobileChannels();
     }
-  }, [scrollToMobileChannels, worldCupChannel]);
+  }, [scrollToMobileChannels]);
 
   const handleButtonPopunder = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
@@ -225,14 +177,6 @@ export function IptvApp() {
     },
     [],
   );
-
-  if (catalogLoading) {
-    return (
-      <div className="iptv-app iptv-loading">
-        <div className="iptv-loading-card">Loading channels…</div>
-      </div>
-    );
-  }
 
   return (
     <div className="iptv-app" onClickCapture={handleButtonPopunder}>
@@ -276,11 +220,11 @@ export function IptvApp() {
                 Sports
               </button>
             ) : null}
-            {worldCupChannel ? (
+            {featuredChannel ? (
               <button
                 type="button"
                 className="fifa-tv-button"
-                onClick={handlePlayWorldCup}
+                onClick={handlePlayFeatured}
               >
                 <AppIcon icon={Trophy} size={16} className="fifa-tv-icon" />
                 World Cup Live
@@ -309,11 +253,11 @@ export function IptvApp() {
               Sports
             </button>
           ) : null}
-          {worldCupChannel ? (
+          {featuredChannel ? (
             <button
               type="button"
               className="quick-filter quick-filter-fifa"
-              onClick={handlePlayWorldCup}
+              onClick={handlePlayFeatured}
             >
               <AppIcon icon={Trophy} size={14} />
               World Cup
@@ -321,8 +265,6 @@ export function IptvApp() {
           ) : null}
         </div>
       </header>
-
-      {/* <AdBanner placement="header" /> */}
 
       <div className="iptv-layout">
         <main className="iptv-main">
@@ -399,7 +341,7 @@ export function IptvApp() {
                   onClick={() => handleSelectGroup("All")}
                 >
                   All
-                  <span>{channels.length}</span>
+                  <span>{CHANNELS.length}</span>
                 </button>
                 {groups.map((group) => (
                   <button
