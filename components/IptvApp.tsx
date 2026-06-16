@@ -17,7 +17,7 @@ import {
   triggerSmartLink,
 } from "@/lib/ads";
 import { preloadHls } from "@/lib/hls-loader";
-import { CHANNELS, type ClientChannel } from "@/lib/client-channel";
+import type { ClientChannel } from "@/lib/client-channel";
 
 import { AdBanner } from "./AdBanner";
 import { BrandLogo } from "./BrandLogo";
@@ -42,12 +42,11 @@ function sortGroups(groups: string[]): string[] {
   });
 }
 
-const featuredChannel =
-  CHANNELS.find((channel) => channel.isFeatured) ?? CHANNELS[0] ?? null;
-
 export function IptvApp() {
+  const [channels, setChannels] = useState<ClientChannel[]>([]);
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [selectedChannel, setSelectedChannel] = useState<ClientChannel | null>(
-    featuredChannel,
+    null,
   );
   const [playbackKey, setPlaybackKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
@@ -58,6 +57,30 @@ export function IptvApp() {
 
   useEffect(() => {
     void preloadHls();
+
+    let cancelled = false;
+
+    void fetch("/api/catalog", { cache: "no-store" })
+      .then((response) => {
+        if (!response.ok) throw new Error("Failed to load channels");
+        return response.json() as Promise<ClientChannel[]>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        setChannels(data);
+        const featured = data.find((channel) => channel.isFeatured);
+        setSelectedChannel((current) => current ?? featured ?? data[0] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setChannels([]);
+      })
+      .finally(() => {
+        if (!cancelled) setCatalogLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const scrollToMobileChannels = useCallback(() => {
@@ -67,17 +90,17 @@ export function IptvApp() {
   }, []);
 
   const groups = useMemo(() => {
-    const unique = new Set(CHANNELS.map((channel) => channel.group));
+    const unique = new Set(channels.map((channel) => channel.group));
     return sortGroups([...unique]);
-  }, []);
+  }, [channels]);
 
   const groupCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const channel of CHANNELS) {
+    for (const channel of channels) {
       counts.set(channel.group, (counts.get(channel.group) ?? 0) + 1);
     }
     return counts;
-  }, []);
+  }, [channels]);
 
   const sportsGroup = useMemo(
     () => groups.find((group) => group.toLowerCase() === "sports") ?? null,
@@ -86,13 +109,18 @@ export function IptvApp() {
 
   const firstSportsChannel = useMemo(() => {
     if (!sportsGroup) return null;
-    return CHANNELS.find((channel) => channel.group === sportsGroup) ?? null;
-  }, [sportsGroup]);
+    return channels.find((channel) => channel.group === sportsGroup) ?? null;
+  }, [channels, sportsGroup]);
+
+  const featuredChannel = useMemo(
+    () => channels.find((channel) => channel.isFeatured) ?? channels[0] ?? null,
+    [channels],
+  );
 
   const filteredChannels = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
 
-    return CHANNELS.filter((channel) => {
+    return channels.filter((channel) => {
       const matchesGroup =
         activeGroup === "All" || channel.group === activeGroup;
       const matchesSearch =
@@ -102,7 +130,7 @@ export function IptvApp() {
 
       return matchesGroup && matchesSearch;
     });
-  }, [activeGroup, searchQuery]);
+  }, [activeGroup, channels, searchQuery]);
 
   const handleSelectChannel = useCallback((channel: ClientChannel) => {
     triggerSmartLink();
@@ -167,7 +195,7 @@ export function IptvApp() {
     if (typeof window !== "undefined" && window.innerWidth < 1180) {
       scrollToMobileChannels();
     }
-  }, [scrollToMobileChannels]);
+  }, [featuredChannel, scrollToMobileChannels]);
 
   const handleButtonPopunder = useCallback(
     (event: React.MouseEvent<HTMLDivElement>) => {
@@ -177,6 +205,14 @@ export function IptvApp() {
     },
     [],
   );
+
+  if (catalogLoading) {
+    return (
+      <div className="iptv-app iptv-loading">
+        <div className="iptv-loading-card">Loading channels…</div>
+      </div>
+    );
+  }
 
   return (
     <div className="iptv-app" onClickCapture={handleButtonPopunder}>
@@ -341,7 +377,7 @@ export function IptvApp() {
                   onClick={() => handleSelectGroup("All")}
                 >
                   All
-                  <span>{CHANNELS.length}</span>
+                  <span>{channels.length}</span>
                 </button>
                 {groups.map((group) => (
                   <button

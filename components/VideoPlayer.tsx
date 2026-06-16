@@ -10,7 +10,7 @@ import {
   STREAM_TIMEOUT_MS,
   type HlsInstance,
 } from "@/lib/hls-loader";
-import type { ClientChannel } from "@/lib/client-channel";
+import { getStreamPath, type ClientChannel } from "@/lib/client-channel";
 
 import { ChannelLogo } from "./ChannelLogo";
 import { AppIcon } from "./icons";
@@ -52,6 +52,7 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
   const [status, setStatus] = useState<"idle" | "loading" | "playing" | "error">(
     "idle",
   );
+  const [usingBackup, setUsingBackup] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -59,15 +60,89 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
     if (!video || !channel) {
       setStatus("idle");
       setErrorMessage(null);
+      setUsingBackup(false);
       return;
     }
 
     let cancelled = false;
-    const url = channel.streamUrl;
+
+    const playUrl = (url: string): Promise<boolean> =>
+      new Promise((resolve) => {
+        if (cancelled) {
+          resolve(false);
+          return;
+        }
+
+        let settled = false;
+        const finish = (success: boolean) => {
+          if (settled || cancelled) return;
+          settled = true;
+          window.clearTimeout(timeoutId);
+          resolve(success);
+        };
+
+        const timeoutId = window.setTimeout(() => finish(false), STREAM_TIMEOUT_MS);
+
+        destroyHls(hlsRef);
+        resetVideo(video);
+
+        const isHls = isHlsPlaybackUrl(url);
+
+        const markPlaying = () => {
+          if (!cancelled) setStatus("playing");
+          finish(true);
+        };
+
+        const markError = () => finish(false);
+
+        const attemptPlay = async () => {
+          const played = await forcePlay(video);
+          if (played) markPlaying();
+        };
+
+        video.addEventListener("playing", markPlaying, { once: true });
+        video.addEventListener("error", markError, { once: true });
+
+        if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
+          video.src = url;
+          void attemptPlay();
+          return;
+        }
+
+        if (isHls) {
+          void preloadHls()
+            .then((Hls) => {
+              if (cancelled || !Hls.isSupported()) {
+                markError();
+                return;
+              }
+
+              const hls = new Hls(HLS_CONFIG);
+              hlsRef.current = hls;
+              hls.attachMedia(video);
+              hls.loadSource(url);
+
+              hls.on(Hls.Events.MANIFEST_PARSED, () => {
+                void attemptPlay();
+              });
+
+              hls.on(Hls.Events.ERROR, (...args: unknown[]) => {
+                const data = args[1] as { fatal?: boolean } | undefined;
+                if (data?.fatal) markError();
+              });
+            })
+            .catch(() => markError());
+          return;
+        }
+
+        video.src = url;
+        void attemptPlay();
+      });
 
     const startPlayback = async () => {
       setStatus("loading");
       setErrorMessage(null);
+      setUsingBackup(false);
 
       try {
         await preloadHls();
@@ -81,75 +156,21 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
 
       if (cancelled) return;
 
-      destroyHls(hlsRef);
-      resetVideo(video);
+      const primaryOk = await playUrl(getStreamPath(channel.id));
+      if (cancelled) return;
+      if (primaryOk) return;
 
-      const isHls = isHlsPlaybackUrl(url);
-      const timeoutId = window.setTimeout(() => {
-        if (!cancelled) {
-          setStatus("error");
-          setErrorMessage("This stream is unavailable right now.");
-        }
-      }, STREAM_TIMEOUT_MS);
-
-      const markPlaying = () => {
-        if (!cancelled) {
-          window.clearTimeout(timeoutId);
-          setStatus("playing");
-        }
-      };
-
-      const markError = () => {
-        if (!cancelled) {
-          window.clearTimeout(timeoutId);
-          setStatus("error");
-          setErrorMessage("This stream is unavailable right now.");
-        }
-      };
-
-      const attemptPlay = async () => {
-        const played = await forcePlay(video);
-        if (played) markPlaying();
-      };
-
-      video.addEventListener("playing", markPlaying, { once: true });
-      video.addEventListener("error", markError, { once: true });
-
-      if (isHls && video.canPlayType("application/vnd.apple.mpegurl")) {
-        video.src = url;
-        void attemptPlay();
-        return;
+      if (channel.hasBackup) {
+        setUsingBackup(true);
+        const backupOk = await playUrl(getStreamPath(channel.id, true));
+        if (cancelled) return;
+        if (backupOk) return;
       }
 
-      if (isHls) {
-        try {
-          const Hls = await preloadHls();
-          if (cancelled || !Hls.isSupported()) {
-            markError();
-            return;
-          }
-
-          const hls = new Hls(HLS_CONFIG);
-          hlsRef.current = hls;
-          hls.attachMedia(video);
-          hls.loadSource(url);
-
-          hls.on(Hls.Events.MANIFEST_PARSED, () => {
-            void attemptPlay();
-          });
-
-          hls.on(Hls.Events.ERROR, (...args: unknown[]) => {
-            const data = args[1] as { fatal?: boolean } | undefined;
-            if (data?.fatal) markError();
-          });
-        } catch {
-          markError();
-        }
-        return;
+      if (!cancelled) {
+        setStatus("error");
+        setErrorMessage("This stream is unavailable right now.");
       }
-
-      video.src = url;
-      void attemptPlay();
     };
 
     void startPlayback();
@@ -183,7 +204,7 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
                   size={40}
                   className="player-spinner-icon"
                 />
-                <p>Wait some moment…</p>
+                <p>{usingBackup ? "Trying backup…" : "Wait some moment…"}</p>
               </div>
             )}
             {status === "error" && (
@@ -213,7 +234,15 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
             />
             <div>
               <h2>{channel.name}</h2>
-              <p>{channel.group}</p>
+              <p>
+                {channel.group}
+                {usingBackup ? (
+                  <>
+                    {" · "}
+                    <span className="source-badge source-sky">Backup</span>
+                  </>
+                ) : null}
+              </p>
             </div>
           </div>
         </div>

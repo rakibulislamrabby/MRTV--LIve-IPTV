@@ -1,0 +1,26 @@
+[
+  {
+    "id": "fifa-bpdogp-1",
+    "name": "Somoy TV",
+    "url": "https://live.thebosstv.com:30443/dwlive/Somoy-TV/chunks.m3u8",
+    "group": "BANGLA",
+    "isFeatured": false
+  },
+  {
+    "id": "fifa-pvc5n4-2",
+    "name": "T Sports HD B",
+    "url": "http://198.195.239.50:8095/tsports/tracks-v1a1/mono.m3u8",
+    "fallbackUrl": "https://tvsen7.aynaott.com/tsportsfhd/index.m3u8",
+    "group": "Sports",
+    "logo": "https://imglink.cc/cdn/RY7jBwPKAr.jpg",
+    "isFeatured": true
+  },
+  {
+    "id": "fifa-rkc0db-3",
+    "name": "TyC Sports ARG",
+    "url": "https://1nyaler.streamhostingcdn.top/stream/84/index.m3u8",
+    "group": "Argentina",
+    "logo": "/logos/tyc-sports.svg",
+    "isFeatured": false
+  }
+]

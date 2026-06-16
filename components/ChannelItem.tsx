@@ -34,7 +34,12 @@ export const ChannelItem = memo(function ChannelItem({
         />
         <div className="channel-copy">
           <span className="channel-name">{channel.name}</span>
-          <span className="channel-meta">{channel.group}</span>
+          <span className="channel-meta">
+            {channel.group}
+            {channel.hasBackup ? (
+              <span className="backup-tag">Backup</span>
+            ) : null}
+          </span>
         </div>
         {isActive && (
           <AppIcon icon={CircleDot} size={14} className="channel-live-dot" />
