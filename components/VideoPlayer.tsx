@@ -139,6 +139,15 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
         void attemptPlay();
       });
 
+    const probeStream = async (streamPath: string): Promise<boolean> => {
+      try {
+        const response = await fetch(streamPath, { cache: "no-store" });
+        return response.ok;
+      } catch {
+        return false;
+      }
+    };
+
     const startPlayback = async () => {
       setStatus("loading");
       setErrorMessage(null);
@@ -156,7 +165,30 @@ export function VideoPlayer({ channel, playbackKey }: VideoPlayerProps) {
 
       if (cancelled) return;
 
-      const primaryOk = await playUrl(getStreamPath(channel.id));
+      const primaryPath = getStreamPath(channel.id);
+      if (!(await probeStream(primaryPath))) {
+        if (cancelled) return;
+
+        if (channel.hasBackup) {
+          setUsingBackup(true);
+          const backupPath = getStreamPath(channel.id, true);
+          if (await probeStream(backupPath)) {
+            const backupOk = await playUrl(backupPath);
+            if (cancelled) return;
+            if (backupOk) return;
+          }
+        }
+
+        if (!cancelled) {
+          setStatus("error");
+          setErrorMessage(
+            "This stream is unavailable on the live site. Try TyC Sports or watch from localhost.",
+          );
+        }
+        return;
+      }
+
+      const primaryOk = await playUrl(primaryPath);
       if (cancelled) return;
       if (primaryOk) return;
 

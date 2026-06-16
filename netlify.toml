@@ -6,3 +6,6 @@
 
 [functions]
   node_bundler = "esbuild"
+
+[functions."___netlify-server-handler"]
+  timeout = 26

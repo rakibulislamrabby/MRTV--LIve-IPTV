@@ -76,7 +76,7 @@ export const HLS_CONFIG = {
   levelLoadingTimeOut: 20_000,
 };
 
-export const STREAM_TIMEOUT_MS = 22_000;
+export const STREAM_TIMEOUT_MS = 12_000;
 
 export function isHlsPlaybackUrl(url: string): boolean {
   return (

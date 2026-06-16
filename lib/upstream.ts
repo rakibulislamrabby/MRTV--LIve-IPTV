@@ -1,4 +1,4 @@
-const TIMEOUT_MS = 18_000;
+const TIMEOUT_MS = 5_000;
 
 export function upstreamHeaders(target: string): Record<string, string> {
   const headers: Record<string, string> = {
@@ -18,8 +18,13 @@ export function upstreamHeaders(target: string): Record<string, string> {
       return headers;
     }
 
-    if (host.includes("streamhostingcdn.top")) {
+    if (host.includes("streamhostingcdn.top") || host.includes("lovetier.bz")) {
       headers.Referer = `${parsed.protocol}//${parsed.host}/`;
+      return headers;
+    }
+
+    if (host.includes("workers.dev")) {
+      headers.Referer = "https://cdn.tv-rds.workers.dev/";
       return headers;
     }
 
@@ -50,6 +55,14 @@ export function segmentContentType(target: string, upstreamType: string): string
   return upstreamType || "application/octet-stream";
 }
 
+export function isDatacenterHost(): boolean {
+  return process.env.NETLIFY === "true" || process.env.VERCEL === "1";
+}
+
+export function isPrivateIpStream(url: string): boolean {
+  return /^http:\/\/\d{1,3}(\.\d{1,3}){3}/.test(url);
+}
+
 export async function fetchUpstream(
   target: string,
   init: RequestInit = {},
@@ -71,4 +84,33 @@ export async function fetchUpstream(
   } finally {
     clearTimeout(timer);
   }
+}
+
+export async function fetchFirstUpstream(
+  targets: string[],
+): Promise<{ target: string; response: Response } | null> {
+  if (targets.length === 0) return null;
+
+  return new Promise((resolve) => {
+    let pending = targets.length;
+    let settled = false;
+
+    for (const target of targets) {
+      void fetchUpstream(target)
+        .then((response) => {
+          if (settled) return;
+          if (response.ok) {
+            settled = true;
+            resolve({ target, response });
+            return;
+          }
+          pending -= 1;
+          if (pending === 0) resolve(null);
+        })
+        .catch(() => {
+          pending -= 1;
+          if (!settled && pending === 0) resolve(null);
+        });
+    }
+  });
 }

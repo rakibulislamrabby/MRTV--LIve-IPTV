@@ -4,7 +4,7 @@ import { getChannelById, getPlaybackUrls } from "@/lib/channels";
 import { rewriteManifest } from "@/lib/manifest-rewrite";
 import { isAllowedStreamUrl } from "@/lib/stream-token";
 import {
-  fetchUpstream,
+  fetchFirstUpstream,
   isHlsManifest,
   segmentContentType,
 } from "@/lib/upstream";
@@ -13,11 +13,11 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 26;
 
-async function proxyTarget(target: string): Promise<NextResponse | null> {
+async function proxyTarget(
+  target: string,
+  upstream: Response,
+): Promise<NextResponse | null> {
   if (!isAllowedStreamUrl(target)) return null;
-
-  const upstream = await fetchUpstream(target);
-  if (!upstream.ok) return null;
 
   const contentType = upstream.headers.get("content-type") ?? "";
 
@@ -54,13 +54,21 @@ export async function GET(request: Request) {
     return new NextResponse("Not found", { status: 404 });
   }
 
-  for (const target of getPlaybackUrls(channel, useFallback)) {
-    try {
-      const response = await proxyTarget(target);
-      if (response) return response;
-    } catch {
-      // try next candidate
+  const targets = getPlaybackUrls(channel, useFallback);
+  if (targets.length === 0) {
+    return new NextResponse("Stream not available on this host", { status: 502 });
+  }
+
+  try {
+    const result = await fetchFirstUpstream(targets);
+    if (!result) {
+      return new NextResponse("Upstream unavailable", { status: 502 });
     }
+
+    const response = await proxyTarget(result.target, result.response);
+    if (response) return response;
+  } catch {
+    // fall through
   }
 
   return new NextResponse("Upstream unavailable", { status: 502 });
