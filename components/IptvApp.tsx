@@ -23,9 +23,10 @@ import { AdBanner } from "./AdBanner";
 import { BrandLogo } from "./BrandLogo";
 import { AppIcon } from "./icons";
 import { ChannelList } from "./ChannelList";
+import { LiveMatchEvents } from "./LiveMatchEvents";
 import { VideoPlayer } from "./VideoPlayer";
 
-const GROUP_PRIORITY = ["Sports", "Argentina"];
+const GROUP_PRIORITY = ["FIFA", "Sports", "Argentina"];
 
 function sortGroups(groups: string[]): string[] {
   return [...groups].sort((a, b) => {
@@ -304,7 +305,10 @@ export function IptvApp() {
 
       <div className="iptv-layout">
         <main className="iptv-main">
-          <VideoPlayer channel={selectedChannel} playbackKey={playbackKey} />
+          <div className="iptv-main-stack">
+            <VideoPlayer channel={selectedChannel} playbackKey={playbackKey} />
+            <LiveMatchEvents />
+          </div>
         </main>
 
         {panelOpen && (

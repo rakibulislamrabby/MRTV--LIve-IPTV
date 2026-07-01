@@ -23,6 +23,12 @@ export function upstreamHeaders(target: string): Record<string, string> {
       return headers;
     }
 
+    if (host.includes("gzxdby.com")) {
+      headers.Origin = "https://arifultv.pro.bd";
+      headers.Referer = "https://arifultv.pro.bd/";
+      return headers;
+    }
+
     if (host.includes("workers.dev")) {
       headers.Referer = "https://cdn.tv-rds.workers.dev/";
       return headers;

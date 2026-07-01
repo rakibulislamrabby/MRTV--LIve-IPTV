@@ -1,0 +1,19 @@
+#EXTM3U
+
+#EXTINF:-1 tvg-logo="https://i.ibb.co.com/YFXSgwM6/Arifultv-pro-bd.png" group-title="FIFA",Backup 1
+https://play.gzxdby.com/live/283334344568_4547627225_1080p.m3u8
+
+#EXTINF:-1 tvg-logo="https://i.ibb.co.com/YFXSgwM6/Arifultv-pro-bd.png" group-title="FIFA",Backup 2
+https://pull.niues.live/live/stream-534219_lhd.m3u8?auth_key=1782784162-0-0-1c9a6e36993915c9c102448d5e7dfbb5
+
+#EXTINF:-1 tvg-logo="https://i.ibb.co.com/YFXSgwM6/Arifultv-pro-bd.png" group-title="FIFA",Server 1
+https://play.gzxdby.com/live/183334344568_2547627555_1080p.m3u8
+
+#EXTINF:-1 tvg-logo="https://i.ibb.co.com/YFXSgwM6/Arifultv-pro-bd.png" group-title="FIFA",Server 2
+https://live.thebosstv.com:30443/dwlive/Somoy-TV/chunks.m3u8
+
+#EXTINF:-1 tvg-logo="https://i.ibb.co.com/YFXSgwM6/Arifultv-pro-bd.png" group-title="FIFA",Server 3
+https://1nyaler.streamhostingcdn.top/stream/23/index.m3u8
+
+#EXTINF:-1 tvg-logo="https://i.ibb.co.com/YFXSgwM6/Arifultv-pro-bd.png" group-title="FIFA",Server 4 8K
+https://edge22.776740.ir.cdn.ir/hls2/sport.m3u8

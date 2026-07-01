@@ -33,11 +33,29 @@ function cleanName(value: string): string {
   return value.replace(/\s+/g, " ").trim();
 }
 
-function inferGroup(name: string, groupTitle?: string): string {
+export interface ParseM3uOptions {
+  idPrefix?: string;
+  featuredChannel?: boolean;
+  defaultGroup?: string;
+}
+
+function inferGroup(
+  name: string,
+  groupTitle?: string,
+  defaultGroup = "Live Sports",
+): string {
   if (groupTitle?.trim()) return groupTitle.trim();
   if (/tyc|argentina/i.test(name)) return "Argentina";
-  if (/sport/i.test(name)) return "Sports";
-  return "Live Sports";
+  if (/sport|cricket|football|bein|espn|star\s?sports/i.test(name)) {
+    return "Sports";
+  }
+  if (/news|24x7|cnn|bbc|dw\s|al\s?jazeera|press/i.test(name)) return "News";
+  if (/bangla|bangladesh|ntv|rtv|btv|channel\s?i/i.test(name)) return "Bangla";
+  if (/quran|sunnah|islam|makkah|saudi\s?tv/i.test(name)) return "Religious";
+  if (/movie|cinema|film|bollywood|drama|music|wild|nature/i.test(name)) {
+    return "Entertainment";
+  }
+  return defaultGroup;
 }
 
 function resolveLogo(name: string, attributes: Record<string, string>): string | undefined {
@@ -47,7 +65,15 @@ function resolveLogo(name: string, attributes: Record<string, string>): string |
   return undefined;
 }
 
-export function parseM3uPlaylist(content: string): Channel[] {
+export function parseM3uPlaylist(
+  content: string,
+  options: ParseM3uOptions = {},
+): Channel[] {
+  const {
+    idPrefix = "ch",
+    featuredChannel = false,
+    defaultGroup = "Live Sports",
+  } = options;
   const lines = content
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -75,15 +101,15 @@ export function parseM3uPlaylist(content: string): Channel[] {
     const [, fallbackName = "Untitled channel"] = metadata.match(/,(.*)$/) ?? [];
     const name = cleanName(attributes["tvg-name"] || fallbackName);
     const url = line;
-    const id = `fifa-${hash(`${name}-${url}`)}`;
+    const id = `${idPrefix}-${hash(`${name}-${url}`)}`;
 
     channels.push({
       id,
       name,
       url,
-      group: inferGroup(name, attributes["group-title"]),
+      group: inferGroup(name, attributes["group-title"], defaultGroup),
       logo: resolveLogo(name, attributes),
-      isFeatured: channels.length === 0,
+      isFeatured: featuredChannel && channels.length === 0,
     });
 
     currentInfo = undefined;
